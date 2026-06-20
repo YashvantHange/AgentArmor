@@ -3,15 +3,20 @@
 # Extract to packaging/embed-python/python/
 
 param(
-    [string]$PythonEmbedUrl = "https://www.python.org/ftp/python/3.12.7/python-3.12.7-embed-amd64.zip",
-    [string]$Dest = $PSScriptRoot
+    [string]$PythonEmbedUrl = "https://www.python.org/ftp/python/3.12.7/python-3.12.7-embed-amd64.zip"
 )
 
 $ErrorActionPreference = "Stop"
-New-Item -ItemType Directory -Force -Path $Dest | Out-Null
-$zip = Join-Path $Dest "python-embed.zip"
-Write-Host "Downloading embeddable Python..."
+# Script lives in packaging/embed-python/ — always extract to ./python/
+$EmbedBase = $PSScriptRoot
+$PythonDir = Join-Path $EmbedBase "python"
+New-Item -ItemType Directory -Force -Path $PythonDir | Out-Null
+$zip = Join-Path $EmbedBase "python-embed.zip"
+Write-Host "Downloading embeddable Python to $PythonDir ..."
 Invoke-WebRequest -Uri $PythonEmbedUrl -OutFile $zip
-Expand-Archive -Path $zip -DestinationPath (Join-Path $Dest "python") -Force
+Expand-Archive -Path $zip -DestinationPath $PythonDir -Force
 Remove-Item $zip
-Write-Host "Embedded Python ready at $Dest/python"
+if (-not (Test-Path (Join-Path $PythonDir "python.exe"))) {
+    Write-Error "python.exe not found after extract — check zip layout at $PythonDir"
+}
+Write-Host "Embedded Python ready at $PythonDir"

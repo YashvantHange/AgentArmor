@@ -9,7 +9,11 @@ param(
 $ErrorActionPreference = "Stop"
 
 if (-not (Test-Path "$EmbedRoot\python.exe")) {
-    Write-Host "Run packaging/embed-python/download.ps1 first"
+    Write-Host "Embedded Python not found — running download.ps1 ..."
+    & (Join-Path $PSScriptRoot "embed-python\download.ps1")
+}
+if (-not (Test-Path "$EmbedRoot\python.exe")) {
+    Write-Error "python.exe missing at $EmbedRoot after download"
     exit 1
 }
 

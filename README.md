@@ -69,6 +69,17 @@ cd gui && npm install && npm run dev   # dev UI at :1420
 
 See [gui/README.md](gui/README.md) for Tauri build instructions.
 
+### macOS
+
+No native Mac `.app` in v1.0.0 — use PyPI + CLI, or dev GUI. See **[docs/MAC.md](docs/MAC.md)**.
+
+```bash
+pip install agentarmor
+agentarmor models download
+agentarmor serve --port 8787
+# Optional GUI: cd gui && npm install && npm run dev  → http://localhost:1420
+```
+
 ### Docker
 
 ```bash

@@ -2,7 +2,7 @@
 # Run from repo root after packaging/embed-python/download.ps1
 
 param(
-    [string]$EmbedRoot = "$PSScriptRoot/embed-python/python",
+    [string]$EmbedRoot = (Join-Path $PSScriptRoot "embed-python\python"),
     [string]$RepoRoot = "$PSScriptRoot\.."
 )
 

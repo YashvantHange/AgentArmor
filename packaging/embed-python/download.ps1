@@ -4,7 +4,7 @@
 
 param(
     [string]$PythonEmbedUrl = "https://www.python.org/ftp/python/3.12.7/python-3.12.7-embed-amd64.zip",
-    [string]$Dest = "$PSScriptRoot/embed-python"
+    [string]$Dest = $PSScriptRoot
 )
 
 $ErrorActionPreference = "Stop"

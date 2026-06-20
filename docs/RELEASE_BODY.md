@@ -1,3 +1,8 @@
+## What's new in v1.0.1
+
+- Redesigned desktop UI (security-console layout, improved scan progress)
+- Fixes for SSE live progress, sidecar startup, and form validation
+
 ## Windows (recommended)
 
 Download **AgentArmor_*_x64-setup.exe** or **.msi** from the assets below.

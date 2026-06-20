@@ -1,14 +1,43 @@
 import { FormEvent, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { Navigate, useNavigate, useParams } from "react-router-dom";
 import { api, ScanCreateBody, ScanType } from "../api/client";
+import { PageHeader } from "../components/layout/PageHeader";
+import { FieldGroup, Input } from "../components/ui/Input";
+import { Button } from "../components/ui/Button";
+import { Alert } from "../components/ui/Alert";
+import { Card } from "../components/ui/Card";
+
+const VALID_TYPES: ScanType[] = ["endpoint", "provider", "local", "agent", "mcp", "rag"];
+
+const TITLES: Record<ScanType, string> = {
+  endpoint: "API endpoint scan",
+  provider: "Cloud provider scan",
+  local: "Local model scan",
+  agent: "Agent framework scan",
+  mcp: "MCP server scan",
+  rag: "RAG corpus scan",
+};
+
+const SUBTITLES: Record<ScanType, string> = {
+  endpoint: "Target an OpenAI-compatible chat completions URL.",
+  provider: "Run probes against a hosted model via LiteLLM routing.",
+  local: "Evaluate weights running on this machine.",
+  agent: "Exercise agent orchestration frameworks with security probes.",
+  mcp: "Audit MCP tool servers for unsafe capabilities.",
+  rag: "Test retrieval corpora for poisoning and leakage.",
+};
 
 export default function ScanConfig() {
-  const { type } = useParams<{ type: ScanType }>();
+  const { type } = useParams<{ type: string }>();
   const navigate = useNavigate();
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const scanType = (type || "endpoint") as ScanType;
+  if (!type || !VALID_TYPES.includes(type as ScanType)) {
+    return <Navigate to="/" replace />;
+  }
+
+  const scanType = type as ScanType;
 
   async function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -19,95 +48,100 @@ export default function ScanConfig() {
       target_type: scanType,
       formats: ["json", "html", "sarif", "pdf"],
     };
-    if (scanType === "endpoint") body.url = String(fd.get("url") || "");
+
+    if (scanType === "endpoint") body.url = String(fd.get("url") || "").trim();
     if (scanType === "provider") {
-      body.provider = String(fd.get("provider") || "");
-      body.model = String(fd.get("model") || "") || undefined;
+      body.provider = String(fd.get("provider") || "").trim();
+      body.model = String(fd.get("model") || "").trim() || undefined;
     }
-    if (scanType === "local") body.model = String(fd.get("model") || "");
+    if (scanType === "local") body.model = String(fd.get("model") || "").trim();
     if (scanType === "agent") {
-      body.agent = String(fd.get("agent") || "crewai");
-      body.agent_config = String(fd.get("agent_config") || "") || undefined;
+      body.agent = String(fd.get("agent") || "crewai").trim();
+      body.agent_config = String(fd.get("agent_config") || "").trim() || undefined;
     }
-    if (scanType === "mcp") body.mcp = String(fd.get("mcp") || "");
+    if (scanType === "mcp") body.mcp = String(fd.get("mcp") || "").trim();
     if (scanType === "rag") {
-      body.rag = String(fd.get("rag") || "");
-      body.embedder = String(fd.get("embedder") || "bge");
+      body.rag = String(fd.get("rag") || "").trim();
+      body.embedder = String(fd.get("embedder") || "bge").trim();
     }
+
+    const required =
+      (scanType === "endpoint" && !body.url) ||
+      (scanType === "provider" && !body.provider) ||
+      (scanType === "local" && !body.model) ||
+      (scanType === "mcp" && !body.mcp) ||
+      (scanType === "rag" && !body.rag);
+
+    if (required) {
+      setError("Please fill in all required fields.");
+      setLoading(false);
+      return;
+    }
+
     try {
       const { scan_id } = await api.createScan(body);
       navigate(`/progress/${scan_id}`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Scan failed");
+      setError(err instanceof Error ? err.message : "Scan failed to start");
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <div className="max-w-lg mx-auto">
-      <h1 className="text-2xl font-bold mb-6 capitalize">{scanType} Scan</h1>
-      <form onSubmit={onSubmit} className="space-y-4">
-        {scanType === "endpoint" && (
-          <Field label="API URL" name="url" placeholder="http://localhost:8000/v1/chat/completions" />
-        )}
-        {scanType === "provider" && (
-          <>
-            <Field label="Provider" name="provider" placeholder="openai" />
-            <Field label="Model (optional)" name="model" placeholder="gpt-3.5-turbo" />
-          </>
-        )}
-        {scanType === "local" && (
-          <Field label="Model path" name="model" placeholder="llama-3.gguf" />
-        )}
-        {scanType === "agent" && (
-          <>
-            <Field label="Framework" name="agent" placeholder="crewai" defaultValue="crewai" />
-            <Field label="Config file (optional)" name="agent_config" placeholder="agent.toml" />
-          </>
-        )}
-        {scanType === "mcp" && (
-          <Field label="MCP path or URL" name="mcp" placeholder="./mcp-server.py" />
-        )}
-        {scanType === "rag" && (
-          <>
-            <Field label="Corpus directory" name="rag" placeholder="./corpus" />
-            <Field label="Embedder" name="embedder" placeholder="bge" defaultValue="bge" />
-          </>
-        )}
-        {error && <p className="text-red-400 text-sm">{error}</p>}
-        <button
-          type="submit"
-          disabled={loading}
-          className="w-full py-2 rounded-lg bg-armor-700 hover:bg-armor-500 disabled:opacity-50 font-medium"
-        >
-          {loading ? "Starting…" : "Start Scan"}
-        </button>
-      </form>
-    </div>
-  );
-}
+    <div className="max-w-xl">
+      <PageHeader title={TITLES[scanType]} subtitle={SUBTITLES[scanType]} backTo="/" />
 
-function Field({
-  label,
-  name,
-  placeholder,
-  defaultValue,
-}: {
-  label: string;
-  name: string;
-  placeholder?: string;
-  defaultValue?: string;
-}) {
-  return (
-    <label className="block">
-      <span className="text-sm text-slate-400">{label}</span>
-      <input
-        name={name}
-        defaultValue={defaultValue}
-        placeholder={placeholder}
-        className="mt-1 w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-600 focus:border-armor-500 outline-none"
-      />
-    </label>
+      <Card className="p-6">
+        <form onSubmit={onSubmit}>
+          <FieldGroup>
+            {scanType === "endpoint" && (
+              <Input
+                label="API URL"
+                name="url"
+                required
+                placeholder="http://localhost:8000/v1/chat/completions"
+              />
+            )}
+            {scanType === "provider" && (
+              <>
+                <Input label="Provider" name="provider" required placeholder="openai" />
+                <Input label="Model" name="model" placeholder="gpt-4o-mini" hint="Optional — uses provider default when empty" />
+              </>
+            )}
+            {scanType === "local" && (
+              <Input label="Model path" name="model" required placeholder="C:\\models\\llama-3.gguf" />
+            )}
+            {scanType === "agent" && (
+              <>
+                <Input label="Framework" name="agent" defaultValue="crewai" required />
+                <Input label="Config file" name="agent_config" placeholder="agent.toml" hint="Optional agent configuration path" />
+              </>
+            )}
+            {scanType === "mcp" && (
+              <Input label="MCP path or URL" name="mcp" required placeholder="./mcp-server.py" />
+            )}
+            {scanType === "rag" && (
+              <>
+                <Input label="Corpus directory" name="rag" required placeholder="./corpus" />
+                <Input label="Embedder" name="embedder" defaultValue="bge" />
+              </>
+            )}
+          </FieldGroup>
+
+          {error && (
+            <div className="mt-4">
+              <Alert tone="error">{error}</Alert>
+            </div>
+          )}
+
+          <div className="mt-6 flex gap-3">
+            <Button type="submit" disabled={loading} className="flex-1">
+              {loading ? "Starting scan…" : "Start scan"}
+            </Button>
+          </div>
+        </form>
+      </Card>
+    </div>
   );
 }

@@ -1,84 +1,131 @@
 import { useEffect, useState } from "react";
 import { api, Settings } from "../api/client";
+import { PageHeader } from "../components/layout/PageHeader";
+import { Input } from "../components/ui/Input";
+import { Card } from "../components/ui/Card";
+import { Alert } from "../components/ui/Alert";
+import { LoadingBlock } from "../components/ui/Spinner";
 
 export default function SettingsPage() {
   const [settings, setSettings] = useState<Settings | null>(null);
+  const [error, setError] = useState("");
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
-    api.getSettings().then(setSettings);
+    api
+      .getSettings()
+      .then(setSettings)
+      .catch((err) => setError(err instanceof Error ? err.message : "Failed to load settings"));
   }, []);
 
   async function save(updates: Partial<Settings>) {
-    const next = await api.updateSettings(updates);
-    setSettings(next);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+    try {
+      const next = await api.updateSettings(updates);
+      setSettings(next);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to save settings");
+    }
   }
 
-  if (!settings) return <p className="text-slate-400">Loading settings…</p>;
+  if (!settings) {
+    return (
+      <div className="max-w-xl">
+        <PageHeader title="Settings" backTo="/" />
+        {error ? <Alert tone="error">{error}</Alert> : <LoadingBlock label="Loading settings…" />}
+      </div>
+    );
+  }
 
   return (
-    <div className="max-w-lg mx-auto">
-      <h1 className="text-2xl font-bold mb-6">Settings</h1>
-      <div className="space-y-6">
-        <Toggle
+    <div className="max-w-xl">
+      <PageHeader
+        title="Settings"
+        subtitle="Configure runtime paths, portable storage, and optional detection features."
+        backTo="/"
+      />
+
+      {error && (
+        <div className="mb-4">
+          <Alert tone="error">{error}</Alert>
+        </div>
+      )}
+
+      {saved && (
+        <div className="mb-4">
+          <Alert tone="info">Settings saved successfully.</Alert>
+        </div>
+      )}
+
+      <Card className="divide-y divide-surface-border">
+        <ToggleRow
           label="Portable mode"
-          desc="Store data in ./data/ next to executable"
+          description="Store database and reports beside the executable in ./data/"
           checked={settings.portable_mode}
           onChange={(v) => save({ portable_mode: v })}
         />
-        <Toggle
-          label="L5 LLM Judge"
-          desc="Enable network-based judge (requires API key)"
+        <ToggleRow
+          label="L5 LLM judge"
+          description="Enable network-based adjudication layer (requires provider API key)"
           checked={settings.l5_enabled}
           onChange={(v) => save({ l5_enabled: v })}
         />
-        <label className="block">
-          <span className="text-sm text-slate-400">Model directory</span>
-          <input
+        <div className="p-5 space-y-4">
+          <Input
+            label="Model directory"
+            key={`model-${settings.model_dir}`}
             defaultValue={settings.model_dir}
-            onBlur={(e) => save({ model_dir: e.target.value })}
-            className="mt-1 w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-600"
+            onBlur={(e) => {
+              if (e.target.value !== settings.model_dir) save({ model_dir: e.target.value });
+            }}
           />
-        </label>
-        <label className="block">
-          <span className="text-sm text-slate-400">Reports output directory</span>
-          <input
+          <Input
+            label="Reports output directory"
+            key={`out-${settings.output_dir}`}
             defaultValue={settings.output_dir}
-            onBlur={(e) => save({ output_dir: e.target.value })}
-            className="mt-1 w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-600"
+            onBlur={(e) => {
+              if (e.target.value !== settings.output_dir) save({ output_dir: e.target.value });
+            }}
           />
-        </label>
-      </div>
-      {saved && <p className="text-green-400 mt-4 text-sm">Settings saved.</p>}
+        </div>
+      </Card>
     </div>
   );
 }
 
-function Toggle({
+function ToggleRow({
   label,
-  desc,
+  description,
   checked,
   onChange,
 }: {
   label: string;
-  desc: string;
+  description: string;
   checked: boolean;
   onChange: (v: boolean) => void;
 }) {
   return (
-    <label className="flex items-start gap-3 cursor-pointer">
-      <input
-        type="checkbox"
-        checked={checked}
-        onChange={(e) => onChange(e.target.checked)}
-        className="mt-1"
-      />
+    <label className="flex cursor-pointer items-start justify-between gap-4 p-5">
       <div>
-        <div className="font-medium">{label}</div>
-        <div className="text-sm text-slate-400">{desc}</div>
+        <div className="text-sm font-medium text-ink-primary">{label}</div>
+        <div className="mt-1 text-sm text-ink-muted">{description}</div>
       </div>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={checked}
+        onClick={() => onChange(!checked)}
+        className={`relative h-6 w-11 shrink-0 rounded-full transition-colors focus-ring ${
+          checked ? "bg-brand-600" : "bg-surface-border-strong"
+        }`}
+      >
+        <span
+          className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${
+            checked ? "translate-x-5" : ""
+          }`}
+        />
+      </button>
     </label>
   );
 }

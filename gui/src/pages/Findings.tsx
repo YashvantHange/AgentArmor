@@ -1,78 +1,130 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { api, Finding } from "../api/client";
-
-const SEV_COLOR: Record<string, string> = {
-  CRITICAL: "text-red-400",
-  HIGH: "text-orange-400",
-  MEDIUM: "text-yellow-400",
-  LOW: "text-blue-400",
-  INFO: "text-slate-400",
-};
+import { PageHeader } from "../components/layout/PageHeader";
+import { Badge, severityTone } from "../components/ui/Badge";
+import { Button } from "../components/ui/Button";
+import { Card } from "../components/ui/Card";
+import { EmptyState } from "../components/ui/EmptyState";
+import { LoadingBlock } from "../components/ui/Spinner";
+import { Alert } from "../components/ui/Alert";
 
 export default function Findings() {
   const { scanId } = useParams<{ scanId: string }>();
-  const [findings, setFindings] = useState<Finding[]>([]);
+  const [findings, setFindings] = useState<Finding[] | null>(null);
+  const [error, setError] = useState("");
   const [selected, setSelected] = useState<Finding | null>(null);
 
-  useEffect(() => {
-    if (scanId) api.getFindings(scanId).then(setFindings);
+  const load = useCallback(() => {
+    if (!scanId) return;
+    setError("");
+    api
+      .getFindings(scanId)
+      .then(setFindings)
+      .catch((err) => setError(err instanceof Error ? err.message : "Failed to load findings"));
   }, [scanId]);
 
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  useEffect(() => {
+    if (!selected) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setSelected(null);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [selected]);
+
+  if (findings === null) {
+    return (
+      <div>
+        <PageHeader title="Findings" backTo={scanId ? `/progress/${scanId}` : "/"} />
+        <LoadingBlock label="Loading findings…" />
+      </div>
+    );
+  }
+
   return (
-    <div className="max-w-4xl mx-auto">
-      <h1 className="text-2xl font-bold mb-6">Findings</h1>
+    <div className="max-w-4xl">
+      <PageHeader
+        title="Findings"
+        subtitle={`${findings.length} issue${findings.length === 1 ? "" : "s"} detected across executed probes.`}
+        backTo={scanId ? `/progress/${scanId}` : "/"}
+      />
+
+      {error && (
+        <div className="mb-4">
+          <Alert tone="error">{error}</Alert>
+        </div>
+      )}
+
       {findings.length === 0 ? (
-        <p className="text-slate-400">No findings — target passed all probes.</p>
+        <EmptyState
+          title="No security findings"
+          description="All probes completed without triggering detection thresholds for this target."
+        />
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-2">
           {findings.map((f) => (
-            <button
-              key={f.id}
-              onClick={() => setSelected(f)}
-              className="w-full text-left p-4 rounded-xl border border-slate-700 bg-slate-900 hover:border-armor-500"
-            >
-              <div className="flex justify-between items-start">
-                <div>
-                  <h2 className="font-semibold">{f.probe_name}</h2>
-                  <p className="text-sm text-slate-400">{f.probe_id}</p>
+            <Card key={f.id} hover className="w-full p-4" onClick={() => setSelected(f)}>
+              <div className="flex items-start justify-between gap-4">
+                <div className="min-w-0">
+                  <h2 className="truncate text-sm font-semibold text-ink-primary">{f.probe_name}</h2>
+                  <p className="mt-0.5 font-mono text-xs text-ink-muted">{f.probe_id}</p>
                 </div>
-                <span className={`font-bold ${SEV_COLOR[f.severity] || ""}`}>{f.severity}</span>
+                <Badge tone={severityTone(f.severity)}>{f.severity}</Badge>
               </div>
-              <div className="flex gap-2 mt-2">
+              <div className="mt-3 flex flex-wrap gap-1.5">
                 {f.owasp.map((t) => (
-                  <span key={t} className="text-xs px-2 py-0.5 rounded bg-indigo-900 text-indigo-200">
+                  <Badge key={t} tone="brand">
                     {t}
-                  </span>
+                  </Badge>
                 ))}
               </div>
-            </button>
+            </Card>
           ))}
         </div>
       )}
+
       {selected && (
         <div
-          className="fixed inset-0 bg-black/60 flex items-center justify-center p-4"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
           onClick={() => setSelected(null)}
+          role="presentation"
         >
           <div
-            className="bg-slate-900 border border-slate-600 rounded-xl p-6 max-w-lg w-full max-h-[80vh] overflow-y-auto"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="finding-title"
+            className="max-h-[85vh] w-full max-w-2xl overflow-y-auto rounded-xl border border-surface-border bg-surface-raised p-6 shadow-panel"
             onClick={(e) => e.stopPropagation()}
           >
-            <h2 className="text-xl font-bold mb-2">{selected.probe_name}</h2>
-            <p className={`mb-4 ${SEV_COLOR[selected.severity]}`}>
-              {selected.severity} · risk {selected.risk_score.toFixed(2)}
-            </p>
-            <h3 className="text-sm text-slate-400 mb-1">Evidence</h3>
-            <pre className="text-sm bg-slate-800 p-3 rounded mb-4 whitespace-pre-wrap">
-              {selected.evidence.join("\n") || selected.response_excerpt}
-            </pre>
-            <button
-              onClick={() => setSelected(null)}
-              className="px-4 py-2 rounded bg-slate-700 hover:bg-slate-600"
-            >
-              Close
-            </button>
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h2 id="finding-title" className="text-lg font-semibold text-ink-primary">
+                  {selected.probe_name}
+                </h2>
+                <p className="mt-1 text-sm text-ink-muted">
+                  Risk score {selected.risk_score.toFixed(2)} · {selected.decision}
+                </p>
+              </div>
+              <Badge tone={severityTone(selected.severity)}>{selected.severity}</Badge>
+            </div>
+
+            <div className="mt-5">
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-ink-muted">Evidence</h3>
+              <pre className="mt-2 overflow-x-auto rounded-lg border border-surface-border bg-surface p-4 font-mono text-xs leading-relaxed text-ink-secondary whitespace-pre-wrap">
+                {selected.evidence.join("\n") || selected.response_excerpt || "No evidence captured."}
+              </pre>
+            </div>
+
+            <div className="mt-6 flex justify-end">
+              <Button variant="secondary" onClick={() => setSelected(null)}>
+                Close
+              </Button>
+            </div>
           </div>
         </div>
       )}

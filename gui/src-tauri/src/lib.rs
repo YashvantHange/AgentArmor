@@ -24,19 +24,26 @@ pub fn run() {
 
 fn spawn_sidecar(handle: &tauri::AppHandle) {
     let port = std::env::var("AGENTARMOR_PORT").unwrap_or_else(|_| "8787".into());
-    let python = resolve_python(handle);
     let model_dir = resolve_model_dir(handle);
 
-    let mut cmd = Command::new(&python);
-    cmd.args([
-        "-m",
-        "agentarmor.cli.main",
-        "serve",
-        "--port",
-        &port,
-        "--host",
-        "127.0.0.1",
-    ]);
+    let mut cmd = if let Some(exe) = resolve_agentarmor_exe(handle) {
+        let mut c = Command::new(exe);
+        c.args(["serve", "--port", &port, "--host", "127.0.0.1"]);
+        c
+    } else {
+        let python = resolve_python(handle);
+        let mut c = Command::new(&python);
+        c.args([
+            "-m",
+            "agentarmor.cli.main",
+            "serve",
+            "--port",
+            &port,
+            "--host",
+            "127.0.0.1",
+        ]);
+        c
+    };
 
     if let Some(dir) = model_dir {
         cmd.args(["--model-dir", &dir]);
@@ -49,9 +56,18 @@ fn spawn_sidecar(handle: &tauri::AppHandle) {
     if let Ok(child) = cmd.spawn() {
         let mut guard = SIDECAR.lock().unwrap();
         *guard = Some(child);
-        // Best-effort health wait (sidecar may take a few seconds on cold start)
-        let _ = wait_for_health(&port, 30);
+        let _ = wait_for_health(&port, 60);
     }
+}
+
+fn resolve_agentarmor_exe(handle: &tauri::AppHandle) -> Option<String> {
+    handle
+        .path()
+        .resource_dir()
+        .ok()
+        .map(|p| p.join("python").join("Scripts").join("agentarmor.exe"))
+        .filter(|p| p.exists())
+        .map(|p| p.to_string_lossy().into_owned())
 }
 
 fn resolve_python(handle: &tauri::AppHandle) -> String {

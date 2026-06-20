@@ -1,39 +1,76 @@
 import { Link } from "react-router-dom";
 import type { ScanType } from "../api/client";
+import { Card, CardHeader } from "../components/ui/Card";
+import { PageHeader } from "../components/layout/PageHeader";
+import { Button } from "../components/ui/Button";
+import {
+  BotIcon,
+  ChartIcon,
+  CloudIcon,
+  DatabaseIcon,
+  GlobeIcon,
+  PlugIcon,
+  ServerIcon,
+} from "../components/icons";
 
-const TILES: { type: ScanType; title: string; desc: string; icon: string }[] = [
-  { type: "endpoint", title: "API Endpoint", desc: "OpenAI-compatible HTTP API", icon: "🌐" },
-  { type: "provider", title: "Cloud Provider", desc: "OpenAI, Anthropic, Gemini…", icon: "☁️" },
-  { type: "local", title: "Local Model", desc: "Offline .gguf / HuggingFace", icon: "💾" },
-  { type: "agent", title: "Agent Security", desc: "CrewAI, LangGraph harness", icon: "🤖" },
-  { type: "mcp", title: "MCP Server", desc: "Tool discovery & abuse", icon: "🔌" },
-  { type: "rag", title: "RAG Corpus", desc: "Poisoning & retrieval attacks", icon: "📚" },
+const TILES: {
+  type: ScanType;
+  title: string;
+  desc: string;
+  icon: typeof GlobeIcon;
+}[] = [
+  { type: "endpoint", title: "API Endpoint", desc: "OpenAI-compatible HTTP APIs and gateways", icon: GlobeIcon },
+  { type: "provider", title: "Cloud Provider", desc: "OpenAI, Anthropic, Gemini, and other hosted models", icon: CloudIcon },
+  { type: "local", title: "Local Model", desc: "Offline GGUF weights and HuggingFace checkpoints", icon: ServerIcon },
+  { type: "agent", title: "Agent Framework", desc: "CrewAI, LangGraph, and autonomous agent stacks", icon: BotIcon },
+  { type: "mcp", title: "MCP Server", desc: "Model Context Protocol tool surfaces and abuse paths", icon: PlugIcon },
+  { type: "rag", title: "RAG Corpus", desc: "Retrieval pipelines, poisoning, and data leakage", icon: DatabaseIcon },
 ];
 
 export default function Home() {
   return (
-    <div className="max-w-4xl mx-auto">
-      <h1 className="text-3xl font-bold mb-2">AgentArmor</h1>
-      <p className="text-slate-400 mb-8">AI Security Validation — pick a scan target</p>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
-        {TILES.map((t) => (
-          <Link
-            key={t.type}
-            to={`/scan/${t.type}`}
-            className="block p-5 rounded-xl border border-slate-700 bg-slate-900 hover:border-armor-500 hover:bg-slate-800 transition"
-          >
-            <span className="text-2xl">{t.icon}</span>
-            <h2 className="text-lg font-semibold mt-2">{t.title}</h2>
-            <p className="text-sm text-slate-400">{t.desc}</p>
-          </Link>
-        ))}
-      </div>
-      <Link
-        to="/benchmark"
-        className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-armor-700 hover:bg-armor-500 text-white font-medium"
-      >
-        📊 Run Model Benchmark
-      </Link>
+    <div>
+      <PageHeader
+        title="Security validation"
+        subtitle="Run structured probes against AI endpoints, providers, agents, and retrieval systems. Results include SARIF, HTML, PDF, and JSON exports."
+      />
+
+      <section>
+        <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-ink-muted">Scan targets</h2>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          {TILES.map((t) => {
+            const Icon = t.icon;
+            return (
+              <Link key={t.type} to={`/scan/${t.type}`} className="group block focus-ring rounded-xl">
+                <Card hover className="h-full p-5">
+                  <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-lg bg-surface-overlay text-brand-400 ring-1 ring-surface-border group-hover:shadow-glow">
+                    <Icon className="h-5 w-5" />
+                  </div>
+                  <CardHeader title={t.title} subtitle={t.desc} />
+                  <div className="mt-4 text-xs font-medium text-brand-400 opacity-0 transition-opacity group-hover:opacity-100">
+                    Configure scan →
+                  </div>
+                </Card>
+              </Link>
+            );
+          })}
+        </div>
+      </section>
+
+      <section className="mt-10 rounded-xl border border-surface-border bg-surface-raised p-5 shadow-panel sm:flex sm:items-center sm:justify-between">
+        <div>
+          <h2 className="text-sm font-semibold text-ink-primary">Model benchmark</h2>
+          <p className="mt-1 text-sm text-ink-muted">
+            Compare pass rates across providers using the OWASP LLM probe suite.
+          </p>
+        </div>
+        <Link to="/benchmark" className="mt-4 block sm:mt-0">
+          <Button variant="secondary">
+            <ChartIcon className="h-4 w-4" />
+            Open benchmark
+          </Button>
+        </Link>
+      </section>
     </div>
   );
 }

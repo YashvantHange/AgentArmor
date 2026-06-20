@@ -6,40 +6,52 @@ export interface ScanEvent {
   data: Record<string, unknown>;
 }
 
+const NAMED_EVENTS = ["scan.started", "probe.started", "probe.completed", "scan.completed"];
+
 export function useScanEvents(scanId: string | null) {
   const [events, setEvents] = useState<ScanEvent[]>([]);
   const [done, setDone] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!scanId) return;
+
     setEvents([]);
     setDone(false);
+    setError(null);
+
     const source = new EventSource(eventsUrl(scanId));
-    source.onmessage = (msg) => {
+    let closed = false;
+
+    const append = (eventName: string, raw: string) => {
       try {
-        const data = JSON.parse(msg.data) as Record<string, unknown>;
-        const eventName = (msg as MessageEvent & { event?: string }).type === "message"
-          ? (data as { event?: string }).event || "message"
-          : "message";
+        const data = JSON.parse(raw) as Record<string, unknown>;
         setEvents((prev) => [...prev, { event: eventName, data }]);
-        if (data && typeof data === "object" && "finding_count" in data) {
+        if (eventName === "scan.completed") {
           setDone(true);
+          closed = true;
           source.close();
         }
       } catch {
-        setEvents((prev) => [...prev, { event: "raw", data: { raw: msg.data } }]);
+        setEvents((prev) => [...prev, { event: eventName, data: { raw } }]);
       }
     };
-    source.addEventListener("scan.completed", () => {
-      setDone(true);
-      source.close();
-    });
+
+    for (const name of NAMED_EVENTS) {
+      source.addEventListener(name, (ev) => append(name, (ev as MessageEvent).data));
+    }
+
     source.onerror = () => {
-      setDone(true);
+      if (closed) return;
+      setError("Connection to scan stream lost");
       source.close();
     };
-    return () => source.close();
+
+    return () => {
+      closed = true;
+      source.close();
+    };
   }, [scanId]);
 
-  return { events, done };
+  return { events, done, error };
 }

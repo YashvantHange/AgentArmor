@@ -22,7 +22,7 @@ if (-not $SkipEmbed) {
 Push-Location $GuiDir
 try {
     if (-not (Test-Path "src-tauri\icons\icon.ico")) {
-        Write-Warning "Missing src-tauri/icons/icon.ico — run: npm run tauri icon <png>"
+        Write-Warning "Missing src-tauri/icons/icon.ico - run: npm run tauri icon <png>"
     }
     npm install
     npm run tauri build

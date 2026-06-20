@@ -79,6 +79,8 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event_name == 'push'
     continue-on-error: true
+    permissions:
+      id-token: write
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

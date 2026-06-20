@@ -7,7 +7,7 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-# Script lives in packaging/embed-python/ — always extract to ./python/
+# Script lives in packaging/embed-python/ - always extract to ./python/
 $EmbedBase = $PSScriptRoot
 $PythonDir = Join-Path $EmbedBase "python"
 New-Item -ItemType Directory -Force -Path $PythonDir | Out-Null
@@ -16,7 +16,8 @@ Write-Host "Downloading embeddable Python to $PythonDir ..."
 Invoke-WebRequest -Uri $PythonEmbedUrl -OutFile $zip
 Expand-Archive -Path $zip -DestinationPath $PythonDir -Force
 Remove-Item $zip
-if (-not (Test-Path (Join-Path $PythonDir "python.exe"))) {
-    Write-Error "python.exe not found after extract — check zip layout at $PythonDir"
+$pythonExe = Join-Path $PythonDir "python.exe"
+if (-not (Test-Path $pythonExe)) {
+    Write-Error "python.exe not found after extract; check zip layout at $PythonDir"
 }
 Write-Host "Embedded Python ready at $PythonDir"

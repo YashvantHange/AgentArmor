@@ -1,0 +1,29 @@
+[target]
+type = "endpoint"
+url = "http://localhost:8000/v1/chat/completions"
+headers = { Authorization = "Bearer ${API_KEY}" }
+
+[engine.endpoint]
+rate_limit_rps = 5
+timeout_s = 30
+
+[detection]
+mode = "local"
+api_url = "http://127.0.0.1:8787"
+l1_enabled = true
+l2_enabled = true
+l3_enabled = true
+l4_enabled = true
+meta_enabled = true
+l5_enabled = false
+confidence_judge_band = [0.4, 0.6]
+model_dir = "~/.agentarmor/models"
+l3_similarity_threshold = 0.82
+fusion_weights = { l1 = 0.6, l4 = 0.4 }
+warn_threshold = 0.4
+fail_threshold = 0.7
+fail_on = ["HIGH", "CRITICAL"]
+
+[reporting]
+formats = ["json", "sarif"]
+output_dir = "./reports"

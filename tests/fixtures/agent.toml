@@ -1,0 +1,3 @@
+[tools]
+allowed = ["search_web", "read_file"]
+forbidden = ["admin_shell", "file_delete"]

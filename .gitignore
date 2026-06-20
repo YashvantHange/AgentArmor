@@ -1,0 +1,39 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+dist/
+build/
+.env
+.venv/
+venv/
+agentarmor.db
+reports/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# GUI / Tauri
+gui/node_modules/
+gui/dist/
+gui/src-tauri/target/
+gui/src-tauri/resources/python/
+gui/src-tauri/resources/models/*
+!gui/src-tauri/resources/models/.gitkeep
+
+# Desktop packaging artifacts
+packaging/embed-python/python/
+dist-portable/
+*.msi
+*.exe
+
+# Local model caches
+.agentarmor/
+models/*.gguf
+models/*.bin
+models/*.safetensors
+
+# IDE
+.idea/
+.vscode/
+*.db-journal

@@ -1,0 +1,65 @@
+name: AgentArmor Scan
+description: Run AgentArmor security scan and upload SARIF to GitHub Security
+branding:
+  icon: shield
+  color: blue
+inputs:
+  config:
+    description: Path to AgentArmor.toml
+    required: false
+    default: AgentArmor.toml
+  url:
+    description: Target API URL (overrides config)
+    required: false
+  provider:
+    description: Cloud provider (openai, anthropic, gemini, ...)
+    required: false
+  suite:
+    description: Benchmark suite name (optional benchmark mode)
+    required: false
+  fail-on:
+    description: Comma-separated severities to fail on
+    required: false
+    default: HIGH,CRITICAL
+  version:
+    description: AgentArmor package version
+    required: false
+    default: "1.0.0"
+runs:
+  using: composite
+  steps:
+    - name: Install AgentArmor
+      shell: bash
+      run: pip install "agentarmor==${{ inputs.version }}"
+    - name: Run security scan
+      shell: bash
+      run: |
+        if [ -n "${{ inputs.suite }}" ]; then
+          agentarmor benchmark --provider "${{ inputs.provider || 'openai' }}" \
+            --suite "${{ inputs.suite }}" -o benchmark.json --format json
+          echo "Benchmark complete"
+          exit 0
+        fi
+        ARGS="--format sarif -o findings.sarif"
+        if [ -n "${{ inputs.url }}" ]; then
+          agentarmor scan --url "${{ inputs.url }}" $ARGS
+        elif [ -n "${{ inputs.provider }}" ]; then
+          agentarmor scan --provider "${{ inputs.provider }}" $ARGS
+        else
+          agentarmor scan --config "${{ inputs.config }}" $ARGS
+        fi
+    - name: Upload SARIF
+      if: inputs.suite == ''
+      uses: github/codeql-action/upload-sarif@v3
+      with:
+        sarif_file: findings.sarif
+    - name: Gate on severity
+      if: inputs.suite == ''
+      shell: bash
+      run: agentarmor gate --sarif findings.sarif --fail-on "${{ inputs.fail-on }}"
+    - name: Upload benchmark artifact
+      if: inputs.suite != ''
+      uses: actions/upload-artifact@v4
+      with:
+        name: model-benchmark
+        path: benchmark.json

@@ -1,0 +1,36 @@
+name: AI Security Scan
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  agentarmor:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -e .
+      - name: Start mock LLM API
+        run: |
+          pip install uvicorn
+          python -c "
+          import subprocess, time, httpx
+          p = subprocess.Popen(['uvicorn', 'tests.fixtures.mock_openai_server:app', '--host', '127.0.0.1', '--port', '8000'])
+          for _ in range(30):
+              try:
+                  httpx.post('http://127.0.0.1:8000/v1/chat/completions', json={'messages':[{'role':'user','content':'hi'}]}, timeout=1)
+                  break
+              except Exception:
+                  time.sleep(0.3)
+          open('.mock_pid','w').write(str(p.pid))
+          "
+      - run: agentarmor scan --url http://127.0.0.1:8000/v1/chat/completions --format sarif -o findings.sarif
+      - uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: findings.sarif
+      - run: agentarmor gate --sarif findings.sarif --fail-on HIGH,CRITICAL
+        if: always()

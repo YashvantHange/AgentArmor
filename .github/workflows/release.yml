@@ -1,0 +1,58 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  pypi:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install build twine
+      - run: python -m build
+      - run: twine check dist/*
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          password: ${{ secrets.PYPI_API_TOKEN }}
+
+  # Docker publish disabled for now — enable when DOCKERHUB_* secrets are configured
+  # docker:
+  #   runs-on: ubuntu-latest
+  #   ...
+
+  windows-gui:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - uses: dtolnay/rust-toolchain@stable
+      - run: pip install -e .
+      - run: agentarmor models download
+      - run: powershell -File packaging/embed-python/download.ps1
+      - run: powershell -File packaging/setup-embed-python.ps1
+      - run: powershell -File packaging/build-installer.ps1 -SkipEmbed
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-installer
+          path: gui/src-tauri/target/release/bundle/
+
+  benchmark-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -e ".[dev]"
+      - run: pytest -q
+      - run: agentarmor benchmark --provider openai --suite owasp --no-save || true

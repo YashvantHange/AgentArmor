@@ -1,0 +1,2 @@
+# Custom probes dropped here are auto-discovered at scan time.
+# Example: probes/custom_probe.py

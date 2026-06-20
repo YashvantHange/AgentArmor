@@ -1,0 +1,6 @@
+Bundled ONNX / FAISS detection models for desktop offline use.
+
+Place model files here before building the Windows installer:
+`python -m agentarmor.cli.main models download`
+
+Then run `packaging/bundle-models.ps1`.

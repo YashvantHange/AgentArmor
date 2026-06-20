@@ -3,7 +3,9 @@
 
 param(
     [string]$EmbedRoot = (Join-Path $PSScriptRoot "embed-python\python"),
-    [string]$RepoRoot = "$PSScriptRoot\.."
+    [string]$RepoRoot = "$PSScriptRoot\..",
+    [string]$WheelPath = "",
+    [switch]$SkipModelsDownload
 )
 
 $ErrorActionPreference = "Stop"
@@ -44,14 +46,21 @@ Push-Location $RepoRoot
 try {
     & "$EmbedRoot\python.exe" -m pip install --upgrade pip wheel
     if ($LASTEXITCODE -ne 0) { throw "pip upgrade failed with exit code $LASTEXITCODE" }
-    & "$EmbedRoot\python.exe" -m pip install "." --no-warn-script-location
+    if ($WheelPath -and (Test-Path $WheelPath)) {
+        Write-Host "Installing prebuilt wheel: $WheelPath"
+        & "$EmbedRoot\python.exe" -m pip install $WheelPath --no-warn-script-location
+    } else {
+        & "$EmbedRoot\python.exe" -m pip install "." --no-warn-script-location
+    }
     if ($LASTEXITCODE -ne 0) { throw "pip install agentarmor failed with exit code $LASTEXITCODE" }
     $agentarmor = Join-Path $EmbedRoot "Scripts\agentarmor.exe"
     if (-not (Test-Path $agentarmor)) {
         throw "agentarmor.exe not found at $agentarmor after pip install"
     }
-    & $agentarmor models download
-    if ($LASTEXITCODE -ne 0) { throw "agentarmor models download failed with exit code $LASTEXITCODE" }
+    if (-not $SkipModelsDownload) {
+        & $agentarmor models download
+        if ($LASTEXITCODE -ne 0) { throw "agentarmor models download failed with exit code $LASTEXITCODE" }
+    }
 } finally {
     Pop-Location
 }

@@ -30,8 +30,14 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - run: pip install -e ".[ml]"
       - run: agentarmor models download
+      - run: pip install build
+      - run: python -m build --wheel
       - run: powershell -File packaging/embed-python/download.ps1
-      - run: powershell -File packaging/setup-embed-python.ps1
+      - name: Setup embedded Python
+        shell: pwsh
+        run: |
+          $wheel = (Get-ChildItem dist/*.whl | Select-Object -First 1).FullName
+          powershell -File packaging/setup-embed-python.ps1 -WheelPath $wheel -SkipModelsDownload
       - run: powershell -File packaging/build-installer.ps1 -SkipEmbed
       - name: Stage release assets
         shell: pwsh

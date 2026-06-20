@@ -8,6 +8,7 @@ build/
 .venv/
 venv/
 agentarmor.db
+agentarmor-settings.json
 reports/
 .pytest_cache/
 .mypy_cache/

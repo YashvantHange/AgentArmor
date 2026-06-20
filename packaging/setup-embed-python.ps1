@@ -43,8 +43,15 @@ Remove-Item $getPip -ErrorAction SilentlyContinue
 Push-Location $RepoRoot
 try {
     & "$EmbedRoot\python.exe" -m pip install --upgrade pip wheel
-    & "$EmbedRoot\python.exe" -m pip install ".[ml]" --no-warn-script-location
-    & "$EmbedRoot\python.exe" -m agentarmor.cli.main models download
+    if ($LASTEXITCODE -ne 0) { throw "pip upgrade failed with exit code $LASTEXITCODE" }
+    & "$EmbedRoot\python.exe" -m pip install "." --no-warn-script-location
+    if ($LASTEXITCODE -ne 0) { throw "pip install agentarmor failed with exit code $LASTEXITCODE" }
+    $agentarmor = Join-Path $EmbedRoot "Scripts\agentarmor.exe"
+    if (-not (Test-Path $agentarmor)) {
+        throw "agentarmor.exe not found at $agentarmor after pip install"
+    }
+    & $agentarmor models download
+    if ($LASTEXITCODE -ne 0) { throw "agentarmor models download failed with exit code $LASTEXITCODE" }
 } finally {
     Pop-Location
 }

@@ -23,26 +23,6 @@ AgentArmor runs structured security probes against your AI stack, scores finding
 | **Monitoring** | Scheduled rescans with drift detection |
 | **CI/CD** | GitHub Action + `agentarmor gate` for pipeline security gates |
 
-### Detection pipeline
-
-```
-Probes (L0–L3 + OWASP suites) → L1 Signatures → L2 Classifier → L3 Semantic → L4 Structural → L5 Judge (cloud)
-                                                                                    ↓
-                                                              Risk score · Attack trees · Evidence graph · Reports
-```
-
----
-
-## Do I need Python or Rust?
-
-| How you use AgentArmor | Python required? | Rust required? |
-|------------------------|------------------|----------------|
-| **Windows installer (.exe / .msi)** | **No** — embedded runtime is bundled | **No** |
-| **PyPI** (`pip install agentarmor`) | **Yes** (3.10+) | **No** |
-| **Docker** | **No** on your machine | **No** |
-| **GitHub Action** | **No** on your machine | **No** |
-| **Build desktop app from source** | Yes | Yes (Tauri) |
-| **Optional Rust L1 speedup** | Yes | Yes (maturin) — falls back to Python if not built |
 
 **End users on Windows:** download the [release installer](https://github.com/YashvantHange/AgentArmor/releases/latest), double-click, and run scans — no Python, Rust, or Node install needed.
 

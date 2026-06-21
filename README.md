@@ -2,6 +2,8 @@
 
 AI Security Validation Platform — scan LLM APIs, cloud providers, local models, produce SARIF/HTML, gate CI on HIGH/CRITICAL.
 
+**Latest release:** [v1.2.0](https://github.com/YashvantHange/AgentArmor/releases/tag/v1.2.0) — see [CHANGELOG.md](CHANGELOG.md).
+
 ## Install
 
 ```bash

@@ -2,13 +2,17 @@ import { ReactNode } from "react";
 import { Link, useLocation } from "react-router-dom";
 import {
   ChartIcon,
+  DatabaseIcon,
   HomeIcon,
+  ServerIcon,
   SettingsIcon,
   ShieldIcon,
 } from "../icons";
 
 const NAV = [
   { to: "/", label: "Dashboard", icon: HomeIcon },
+  { to: "/marketplace", label: "Marketplace", icon: DatabaseIcon },
+  { to: "/monitoring", label: "Monitoring", icon: ServerIcon },
   { to: "/benchmark", label: "Benchmark", icon: ChartIcon },
   { to: "/settings", label: "Settings", icon: SettingsIcon },
 ];
@@ -25,7 +29,7 @@ export function Shell({
   const location = useLocation();
 
   return (
-    <div className="flex min-h-screen bg-[#09090b]">
+    <div className="flex min-h-screen bg-app">
       <aside className="hidden w-60 shrink-0 flex-col border-r border-surface-border bg-surface lg:flex">
         <div className="flex items-center gap-2.5 border-b border-surface-border px-5 py-5">
           <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand-500/15 text-brand-400 ring-1 ring-brand-500/20">
@@ -72,8 +76,8 @@ export function Shell({
         </header>
 
         {online === false && (
-          <div className="border-b border-amber-500/20 bg-amber-500/10 px-4 py-2.5 text-center text-sm text-amber-100">
-            Backend service is starting or offline. Scans will be unavailable until the sidecar is ready.
+          <div className="banner-warning border-b px-4 py-2.5 text-center text-sm">
+            Backend service is offline. Scans will be unavailable until the engine is ready.
           </div>
         )}
 

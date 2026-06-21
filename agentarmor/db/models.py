@@ -102,6 +102,37 @@ class MetricRecord(Base):
     )
 
 
+class ScheduleRecord(Base):
+    __tablename__ = "schedules"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    name: Mapped[str] = mapped_column(String(256))
+    target_type: Mapped[str] = mapped_column(String(32))
+    config_json: Mapped[str] = mapped_column(Text)
+    cron: Mapped[str] = mapped_column(String(32), default="daily")
+    enabled: Mapped[int] = mapped_column(Integer, default=1)
+    last_run_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    last_scan_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    last_finding_count: Mapped[int] = mapped_column(Integer, default=0)
+    drift_detected: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.now(timezone.utc)
+    )
+
+
+class InstalledRuleRecord(Base):
+    __tablename__ = "installed_rules"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    manifest_id: Mapped[str] = mapped_column(String(128), index=True)
+    name: Mapped[str] = mapped_column(String(256))
+    version: Mapped[str] = mapped_column(String(32))
+    install_path: Mapped[str] = mapped_column(String(1024))
+    installed_at: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.now(timezone.utc)
+    )
+
+
 def get_engine(database_url: str):
     connect_args = {"check_same_thread": False} if database_url.startswith("sqlite") else {}
     return create_engine(database_url, connect_args=connect_args)

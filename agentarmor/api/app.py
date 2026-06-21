@@ -14,12 +14,18 @@ from sse_starlette.sse import EventSourceResponse
 
 from agentarmor import __version__
 from agentarmor.api.routes.benchmarks import router as benchmarks_router
+from agentarmor.api.routes.datasets import router as datasets_router
+from agentarmor.api.routes.marketplace import router as marketplace_router
+from agentarmor.api.routes.monitoring import router as monitoring_router
 from agentarmor.api.routes.scans import router as scans_router
 from agentarmor.api.routes.settings import router as settings_router
+from agentarmor.api.routes.targets import router as targets_router
 from agentarmor.core.config import load_config
 from agentarmor.core.events import event_bus
 from agentarmor.db.benchmark_session import BenchmarkRepository
+from agentarmor.db.monitor_session import MonitorRepository
 from agentarmor.db.session import ScanRepository
+from agentarmor.monitoring.scheduler import MonitoringScheduler
 from agentarmor.detection.api.routes import router as detection_router
 
 _config_path = Path(os.environ.get("AGENTARMOR_CONFIG", "AgentArmor.toml"))
@@ -35,13 +41,21 @@ if os.environ.get("AGENTARMOR_DATA_DIR"):
 
 _repo = ScanRepository(_app_config.database_url)
 _benchmark_repo = BenchmarkRepository(_app_config.database_url)
+_monitor_repo = MonitorRepository(_app_config.database_url)
+_scheduler: MonitoringScheduler | None = None
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    global _scheduler
     _repo.ensure_schema()
     _benchmark_repo.ensure_schema()
+    _monitor_repo.ensure_schema()
+    _scheduler = MonitoringScheduler(_monitor_repo, _app_config)
+    _scheduler.start()
     yield
+    if _scheduler:
+        await _scheduler.stop()
 
 
 app = FastAPI(title="AgentArmor", version=__version__, lifespan=lifespan)
@@ -54,8 +68,12 @@ app.add_middleware(
 )
 app.include_router(detection_router)
 app.include_router(benchmarks_router)
+app.include_router(marketplace_router)
+app.include_router(monitoring_router)
+app.include_router(datasets_router)
 app.include_router(scans_router)
 app.include_router(settings_router)
+app.include_router(targets_router)
 
 
 @app.get("/health")

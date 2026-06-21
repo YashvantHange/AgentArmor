@@ -11,7 +11,8 @@ import uvicorn
 
 from agentarmor.cli.gate import gate_main
 from agentarmor.cli.benchmark import benchmark_app
-from agentarmor.core.config import load_config, merge_cli_target
+from agentarmor.cli.ecosystem import dataset_app, marketplace_app, monitor_app
+from agentarmor.core.config import apply_analysis_options, load_config, merge_cli_target
 from agentarmor.db.models import init_db
 
 app = typer.Typer(
@@ -21,6 +22,9 @@ app = typer.Typer(
 )
 
 app.add_typer(benchmark_app, name="benchmark")
+app.add_typer(marketplace_app, name="marketplace")
+app.add_typer(monitor_app, name="monitor")
+app.add_typer(dataset_app, name="dataset")
 
 
 @app.command()
@@ -48,6 +52,21 @@ def scan(
         None, "--format", help="Report format: json, sarif, html, pdf, csv, or comma-separated"
     ),
     output: Optional[Path] = typer.Option(None, "--output", "-o", help="Output file path"),
+    analysis_mode: Optional[str] = typer.Option(
+        None, "--analysis-mode", help="Finding analysis: offline or cloud"
+    ),
+    analysis_provider: Optional[str] = typer.Option(
+        None, "--analysis-provider", help="Cloud analysis provider (openai, anthropic, gemini)"
+    ),
+    analysis_model: Optional[str] = typer.Option(
+        None, "--analysis-model", help="Cloud analysis model id"
+    ),
+    analysis_api_key: Optional[str] = typer.Option(
+        None, "--analysis-api-key", help="API key for cloud-enhanced analysis"
+    ),
+    auth_token: Optional[str] = typer.Option(
+        None, "--auth-token", help="Bearer token for target API (chatbot)"
+    ),
 ) -> None:
     """Run a security scan (endpoint, provider, local model, agent, MCP, or RAG)."""
     try:
@@ -61,6 +80,14 @@ def scan(
             rag=rag,
             embedder=embedder,
             agent_config=str(agent_config) if agent_config else None,
+        )
+        cfg = apply_analysis_options(
+            cfg,
+            analysis_mode=analysis_mode,
+            analysis_provider=analysis_provider,
+            analysis_model=analysis_model,
+            analysis_api_key=analysis_api_key,
+            auth_token=auth_token,
         )
     except ValueError as exc:
         typer.echo(f"Error: {exc}", err=True)

@@ -1,6 +1,6 @@
 # AgentArmor
 
-**The Nuclei of AI Security** — continuously test, audit, and red-team LLM APIs, agents, MCP servers, and RAG systems.
+**The Armor for AI Security** — continuously test, audit, and red-team LLM APIs, agents, MCP servers, and RAG systems.
 
 AgentArmor runs structured security probes against your AI stack, scores findings with an enterprise risk model (0–100), maps results to **OWASP LLM Top 10**, and exports reports for developers and security teams (SARIF, HTML, PDF, CSV).
 

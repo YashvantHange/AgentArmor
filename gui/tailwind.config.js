@@ -9,11 +9,11 @@ export default {
       },
       colors: {
         surface: {
-          DEFAULT: "#111113",
-          raised: "#18181b",
-          overlay: "#1f1f23",
-          border: "#2a2a30",
-          "border-strong": "#3f3f46",
+          DEFAULT: "var(--surface)",
+          raised: "var(--surface-raised)",
+          overlay: "var(--surface-overlay)",
+          border: "var(--surface-border)",
+          "border-strong": "var(--surface-border-strong)",
         },
         brand: {
           50: "#ecfdf5",
@@ -24,14 +24,17 @@ export default {
           700: "#047857",
         },
         ink: {
-          primary: "#fafafa",
-          secondary: "#a1a1aa",
-          muted: "#71717a",
+          primary: "var(--ink-primary)",
+          secondary: "var(--ink-secondary)",
+          muted: "var(--ink-muted)",
         },
       },
       boxShadow: {
-        panel: "0 1px 0 0 rgba(255,255,255,0.04) inset, 0 8px 24px rgba(0,0,0,0.35)",
-        glow: "0 0 0 1px rgba(16,185,129,0.15), 0 0 24px rgba(16,185,129,0.08)",
+        panel: "var(--shadow-panel)",
+        glow: "var(--shadow-glow)",
+      },
+      backgroundColor: {
+        app: "var(--app-bg)",
       },
     },
   },

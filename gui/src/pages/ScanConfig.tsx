@@ -1,6 +1,14 @@
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { Navigate, useNavigate, useParams } from "react-router-dom";
 import { api, ScanCreateBody, ScanType } from "../api/client";
+import { AnalysisModePicker, AnalysisModeValue } from "../components/AnalysisModePicker";
+import {
+  DEFAULT_REDTEAM,
+  RedTeamOptions,
+  RedTeamOptionsPicker,
+  redTeamToScanBody,
+  settingsToRedTeam,
+} from "../components/RedTeamOptionsPicker";
 import { PageHeader } from "../components/layout/PageHeader";
 import { FieldGroup, Input } from "../components/ui/Input";
 import { Button } from "../components/ui/Button";
@@ -19,7 +27,7 @@ const TITLES: Record<ScanType, string> = {
 };
 
 const SUBTITLES: Record<ScanType, string> = {
-  endpoint: "Target an OpenAI-compatible chat completions URL.",
+  endpoint: "Chat API POST URL — auto-detects OpenAI and common JSON formats.",
   provider: "Run probes against a hosted model via LiteLLM routing.",
   local: "Evaluate weights running on this machine.",
   agent: "Exercise agent orchestration frameworks with security probes.",
@@ -32,6 +40,20 @@ export default function ScanConfig() {
   const navigate = useNavigate();
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [analysis, setAnalysis] = useState<AnalysisModeValue>({ analysis_mode: "offline" });
+  const [redTeam, setRedTeam] = useState<RedTeamOptions>(DEFAULT_REDTEAM);
+
+  useEffect(() => {
+    api.getSettings().then((s) => {
+      setAnalysis({
+        analysis_mode: (s.analysis_mode as "offline" | "cloud") || "offline",
+        analysis_provider: s.analysis_provider,
+        analysis_model: s.analysis_model,
+        analysis_api_key: s.analysis_api_key,
+      });
+      setRedTeam(settingsToRedTeam(s));
+    });
+  }, []);
 
   if (!type || !VALID_TYPES.includes(type as ScanType)) {
     return <Navigate to="/" replace />;
@@ -47,6 +69,9 @@ export default function ScanConfig() {
     const body: ScanCreateBody = {
       target_type: scanType,
       formats: ["json", "html", "sarif", "pdf"],
+      endpoint_profile: scanType === "endpoint" ? "auto" : undefined,
+      ...analysis,
+      ...redTeamToScanBody(redTeam),
     };
 
     if (scanType === "endpoint") body.url = String(fd.get("url") || "").trim();
@@ -64,6 +89,9 @@ export default function ScanConfig() {
       body.rag = String(fd.get("rag") || "").trim();
       body.embedder = String(fd.get("embedder") || "bge").trim();
     }
+
+    const authToken = String(fd.get("auth_token") || "").trim();
+    if (authToken) body.auth_token = authToken;
 
     const required =
       (scanType === "endpoint" && !body.url) ||
@@ -127,7 +155,28 @@ export default function ScanConfig() {
                 <Input label="Embedder" name="embedder" defaultValue="bge" />
               </>
             )}
+            {(scanType === "endpoint" || scanType === "provider") && (
+              <Input
+                label="Bearer token (optional)"
+                name="auth_token"
+                type="password"
+                placeholder="sk-... or Bearer token"
+              />
+            )}
           </FieldGroup>
+
+          <div className="mt-6 border-t border-surface-border pt-6">
+            <AnalysisModePicker value={analysis} onChange={setAnalysis} />
+          </div>
+
+          <div className="mt-6 border-t border-surface-border pt-6">
+            <RedTeamOptionsPicker
+              value={redTeam}
+              onChange={setRedTeam}
+              scanType={scanType}
+              analysisMode={analysis.analysis_mode}
+            />
+          </div>
 
           {error && (
             <div className="mt-4">

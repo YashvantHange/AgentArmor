@@ -8,9 +8,8 @@ from pathlib import Path
 from fastapi import APIRouter, BackgroundTasks, HTTPException
 from pydantic import BaseModel, Field
 
-from agentarmor.core.config import load_config, merge_cli_target
-from agentarmor.core.events import event_bus
-from agentarmor.core.models import Scan, TargetType
+from agentarmor.core.config import apply_analysis_options, apply_endpoint_options, apply_redteam_options, load_config, merge_cli_target
+from agentarmor.core.models import Scan
 from agentarmor.db.session import ScanRepository
 from agentarmor.engines.router import validate_target
 from agentarmor.services.scan_service import execute_scan
@@ -32,6 +31,24 @@ class ScanCreateRequest(BaseModel):
     mcp: str | None = None
     rag: str | None = None
     embedder: str | None = None
+    auth_token: str | None = None
+    analysis_mode: str = "offline"
+    analysis_provider: str | None = None
+    analysis_model: str | None = None
+    analysis_api_key: str | None = None
+    endpoint_profile: str | None = "auto"
+    request_template: str | None = None
+    response_path: str | None = None
+    redteam_plugins: list[str] | None = None
+    l0_enabled: bool | None = None
+    max_variants_per_goal: int | None = None
+    l0_suites: list[str] | None = None
+    cloud_mutations_enabled: bool | None = None
+    self_play_enabled: bool | None = None
+    self_play_max_rounds: int | None = None
+    self_play_stop_on_success: bool | None = None
+    self_play_discovery_enabled: bool | None = None
+    self_play_defender_enabled: bool | None = None
     formats: list[str] = Field(default_factory=lambda: ["json", "html", "sarif"])
     config_path: str | None = None
 
@@ -57,6 +74,33 @@ def _build_config(body: ScanCreateRequest):
         cfg = merge_cli_target(cfg, rag=body.rag, embedder=body.embedder)
     else:
         raise HTTPException(400, f"unsupported target_type: {body.target_type}")
+    cfg = apply_analysis_options(
+        cfg,
+        analysis_mode=body.analysis_mode,
+        analysis_provider=body.analysis_provider,
+        analysis_model=body.analysis_model,
+        analysis_api_key=body.analysis_api_key,
+        auth_token=body.auth_token,
+    )
+    cfg = apply_endpoint_options(
+        cfg,
+        endpoint_profile=body.endpoint_profile,
+        request_template=body.request_template,
+        response_path=body.response_path,
+        redteam_plugins=body.redteam_plugins,
+    )
+    cfg = apply_redteam_options(
+        cfg,
+        l0_enabled=body.l0_enabled,
+        max_variants_per_goal=body.max_variants_per_goal,
+        l0_suites=body.l0_suites,
+        cloud_mutations_enabled=body.cloud_mutations_enabled,
+        self_play_enabled=body.self_play_enabled,
+        self_play_max_rounds=body.self_play_max_rounds,
+        self_play_stop_on_success=body.self_play_stop_on_success,
+        self_play_discovery_enabled=body.self_play_discovery_enabled,
+        self_play_defender_enabled=body.self_play_defender_enabled,
+    )
     validate_target(cfg)
     return cfg
 
@@ -71,7 +115,12 @@ async def create_scan(body: ScanCreateRequest, background_tasks: BackgroundTasks
     scan = Scan(target=cfg.target)
     _repo.save_scan(scan)
     background_tasks.add_task(_run_scan_background, cfg, scan.id, body.formats)
-    return {"scan_id": scan.id, "status": "started", "target_type": cfg.target.type.value}
+    return {
+        "scan_id": scan.id,
+        "status": "started",
+        "target_type": cfg.target.type.value,
+        "analysis_mode": cfg.detection.analysis_mode,
+    }
 
 
 async def _run_scan_background(cfg, scan_id: str, formats: list[str]) -> None:

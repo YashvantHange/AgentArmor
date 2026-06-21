@@ -1,7 +1,36 @@
-## What's new in v1.0.1
+## AgentArmor v1.2.0 — Full Platform Release
 
-- Redesigned desktop UI (security-console layout, improved scan progress)
-- Fixes for SSE live progress, sidecar startup, and form validation
+All four development phases ship together in this release.
+
+### Phase 1 — Universal endpoint scanning
+- OpenAI / custom / auto-detected API profiles
+- Connectivity guards (no silent PASS on HTML errors)
+- Promptfoo-inspired plugins, strategies, and assertions
+- Multi-agent cloud enrichment (judge, triage, OWASP mapping)
+- Chatbot security wizard in the desktop GUI
+
+### Phase 2 — Adaptive attack generation
+- L0 attack generator with 100+ mutation variants per goal
+- OWASP suites: prompt leak, poisoning, model theft, memory poison
+- Enterprise risk score (0–100) with exploitability and confidence
+- Attack trees and evidence graph in findings UI
+
+### Phase 3 — Self-play red teaming
+- Attacker / Defender / Judge autonomous loop
+- Multi-agent attack discovery (Garak-style)
+- Tools benchmark: compare AgentArmor vs PyRIT, Garak, Promptfoo, Inspect AI
+
+### Phase 4 — Ecosystem
+- Community rule marketplace (install probes and OWASP packs)
+- Custom Probe SDK for third-party extensions
+- Continuous monitoring with scheduled rescans and drift detection
+- Research dataset export (anonymized JSONL)
+
+### Desktop GUI
+- Redesigned security-console UI
+- Marketplace, Monitoring, Benchmark, and Chatbot wizard screens
+
+---
 
 ## Windows (recommended)
 
@@ -15,39 +44,26 @@ Portable mode: run from a folder containing a `PORTABLE` file; data is stored in
 
 ## macOS
 
-A native Mac `.app` is **not bundled in v1.0.0** (Windows desktop first). Use the CLI + web UI:
+A native Mac `.app` is **not bundled** (Windows desktop first). Use the CLI + web UI:
 
 ```bash
-# Install
 pip install agentarmor
 pip install agentarmor[local]   # optional: offline .gguf scanning
-
-# Detection models (one-time)
 agentarmor models download
-
-# Terminal 1 — API sidecar
 agentarmor serve --port 8787
-
-# Terminal 2 — GUI (dev mode)
-git clone https://github.com/YashvantHange/AgentArmor.git
 cd AgentArmor/gui && npm install && npm run dev
-# Open http://localhost:1420
 ```
 
-Or use **CLI only** (no GUI):
-
-```bash
-agentarmor scan --provider openai --format html,sarif
-agentarmor benchmark --providers openai,anthropic --suite owasp
-```
-
-See [docs/MAC.md](https://github.com/YashvantHange/AgentArmor/blob/main/docs/MAC.md) for full Mac instructions.
+See [docs/MAC.md](https://github.com/YashvantHange/AgentArmor/blob/main/docs/MAC.md).
 
 ## Linux / PyPI
 
 ```bash
 pip install agentarmor
 agentarmor scan --url http://localhost:8000/v1/chat/completions
+agentarmor marketplace list
+agentarmor monitor add "Daily API" --url https://api.example.com/v1/chat/completions
+agentarmor dataset export -o research.jsonl
 ```
 
 ## GitHub Action (CI)

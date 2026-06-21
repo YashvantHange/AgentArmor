@@ -226,11 +226,12 @@ async def _maybe_judge(
 
 def _error_result(error: str) -> DetectionResult:
     return DetectionResult(
-        risk_score=0.1,
-        severity=Severity.INFO,
-        decision=Decision.PASS,
-        evidence=[f"request error: {error}"],
-        layers={"error": error},
+        risk_score=0.2,
+        severity=Severity.MEDIUM,
+        decision=Decision.WARN,
+        evidence=[f"connectivity: {error}"],
+        layers={"error": error, "connectivity": True},
+        categories=["connectivity"],
     )
 
 

@@ -19,10 +19,14 @@ if (-not $SkipEmbed) {
 
 & "$PSScriptRoot\bundle-models.ps1"
 
+Write-Host "Generating application icon..."
+python "$PSScriptRoot\generate-tauri-icon.py"
+
 Push-Location $GuiDir
 try {
     if (-not (Test-Path "src-tauri\icons\icon.ico")) {
-        Write-Warning "Missing src-tauri/icons/icon.ico - run: npm run tauri icon <png>"
+        Write-Host "Building Tauri icon set from icon.png..."
+        npx --yes @tauri-apps/cli icon src-tauri/icons/icon.png
     }
     npm install
     npm run tauri build

@@ -18,12 +18,14 @@ export default function ScanProgress() {
   const { events, done, error } = useScanEvents(scanId ?? null);
   const [findingCount, setFindingCount] = useState(0);
   const [status, setStatus] = useState<string>("running");
+  const [selfPlay, setSelfPlay] = useState<{ successful?: boolean; rounds?: number } | null>(null);
 
   useEffect(() => {
     if (!scanId || !done) return;
     api.getScan(scanId).then((s) => {
       setFindingCount(s.finding_count);
       setStatus(s.status);
+      setSelfPlay(s.metadata?.self_play ?? null);
     });
   }, [scanId, done]);
 
@@ -96,7 +98,9 @@ export default function ScanProgress() {
                 </div>
                 {ev.event === "probe.completed" && (
                   <p className="mt-1 text-xs text-ink-muted">
-                    Decision: {String(ev.data.decision ?? "—")} · Findings: {String(ev.data.finding_count ?? 0)}
+                    Decision: {String(ev.data.decision ?? "—")} · Severity: {String(ev.data.severity ?? "—")}
+                    {ev.data.error ? ` · Error: ${String(ev.data.error)}` : ""}
+                    {ev.data.profile ? ` · Profile: ${String(ev.data.profile)}` : ""}
                   </p>
                 )}
                 {ev.event === "scan.completed" && (
@@ -109,6 +113,15 @@ export default function ScanProgress() {
           </ul>
         )}
       </Card>
+
+      {done && selfPlay && (
+        <div className="mb-4">
+          <Alert tone={selfPlay.successful ? "info" : "warning"}>
+            Self-play red teaming: {selfPlay.rounds ?? 0} round(s)
+            {selfPlay.successful ? " — vulnerability discovered" : " — no confirmed exploit chain"}
+          </Alert>
+        </div>
+      )}
 
       {done && (
         <div className="mt-6 flex flex-wrap gap-3">

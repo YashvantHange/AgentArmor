@@ -1,7 +1,0 @@
-{
-  "portable_mode": true,
-  "l5_enabled": false,
-  "model_dir": "~/.agentarmor/models",
-  "output_dir": "./reports",
-  "api_url": "http://127.0.0.1:8787"
-}

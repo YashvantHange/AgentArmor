@@ -16,7 +16,7 @@ async def test_endpoint_client():
     transport = ASGITransport(app=mock_app)
     config = AppConfig(
         target=Target(url="http://testserver/v1/chat/completions"),
-        engine_endpoint=EndpointEngineConfig(rate_limit_rps=100, timeout_s=5),
+        engine_endpoint=EndpointEngineConfig(rate_limit_rps=100, timeout_s=5, profile="openai"),
     )
     client = EndpointClient(config.engine_endpoint)
 
@@ -48,7 +48,7 @@ async def test_endpoint_client_live_config(monkeypatch):
     transport = ASGITransport(app=mock_app)
     config = AppConfig(
         target=Target(url="http://testserver/v1/chat/completions"),
-        engine_endpoint=EndpointEngineConfig(rate_limit_rps=100, timeout_s=5),
+        engine_endpoint=EndpointEngineConfig(rate_limit_rps=100, timeout_s=5, profile="openai"),
     )
 
     async with AsyncClient(transport=transport, base_url="http://testserver") as http:

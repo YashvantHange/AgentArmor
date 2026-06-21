@@ -72,7 +72,7 @@ _HTML_TEMPLATE = """<!DOCTYPE html>
   <table>
     <thead>
       <tr>
-        <th>Probe</th>
+        <th>Issue</th>
         <th>Severity</th>
         <th>OWASP</th>
         <th>Risk</th>
@@ -81,8 +81,9 @@ _HTML_TEMPLATE = """<!DOCTYPE html>
     </thead>
     <tbody>
       {% for f in findings %}
+      {% set e = f.metadata.get('enrichment', {}) if f.metadata else {} %}
       <tr>
-        <td>{{ f.probe_name }}<br><span class="meta">{{ f.probe_id }}</span></td>
+        <td>{{ e.get('plain_title') or f.probe_name }}<br><span class="meta">{{ f.probe_id }}</span></td>
         <td class="severity-{{ f.severity.value }}">{{ f.severity.value }}</td>
         <td>{% for t in f.owasp %}<span class="owasp-tag">{{ t }}</span>{% endfor %}</td>
         <td>{{ "%.2f"|format(f.risk_score) }}</td>
@@ -98,6 +99,23 @@ _HTML_TEMPLATE = """<!DOCTYPE html>
       {% endfor %}
     </tbody>
   </table>
+
+  <h2>Issue details</h2>
+  {% for f in findings %}
+  {% set e = f.metadata.get('enrichment', {}) if f.metadata else {} %}
+  {% if e %}
+  <div class="card" style="margin-bottom:1rem;">
+    <h3>{{ e.get('plain_title') or f.probe_name }}</h3>
+    {% if e.get('what_happened') %}<p><strong>What happened:</strong> {{ e.what_happened }}</p>{% endif %}
+    {% if e.get('why_it_matters') %}<p><strong>Why it matters:</strong> {{ e.why_it_matters }}</p>{% endif %}
+    {% if e.get('remediation') %}
+    <p><strong>Remediation:</strong></p>
+    <ul>{% for r in e.remediation %}<li>{{ r }}</li>{% endfor %}</ul>
+    {% endif %}
+    {% if e.get('agentic_notes') %}<p><strong>AI analyst notes:</strong> {{ e.agentic_notes }}</p>{% endif %}
+  </div>
+  {% endif %}
+  {% endfor %}
   {% else %}
   <p>No findings to report.</p>
   {% endif %}

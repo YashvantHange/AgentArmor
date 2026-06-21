@@ -9,7 +9,7 @@ on:
       tag:
         description: Release tag to build (e.g. v1.0.0)
         required: true
-        default: v1.0.1
+        default: v1.2.0
 
 env:
   RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
@@ -38,6 +38,7 @@ jobs:
         run: |
           $wheel = (Get-ChildItem dist/*.whl | Select-Object -First 1).FullName
           powershell -File packaging/setup-embed-python.ps1 -WheelPath $wheel -SkipModelsDownload
+      - run: python packaging/generate-tauri-icon.py
       - run: powershell -File packaging/build-installer.ps1 -SkipEmbed
       - name: Stage release assets
         shell: pwsh

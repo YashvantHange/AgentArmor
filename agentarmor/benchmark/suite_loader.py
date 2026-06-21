@@ -15,6 +15,7 @@ from agentarmor.orchestrator.probes.l3_multiturn import MultiTurnProbe, get_l3_p
 SUITE_ALIASES = {
     "owasp": "owasp-llm-v1",
     "owasp-llm": "owasp-llm-v1",
+    "owasp-llm01": "owasp-llm-v1",
 }
 
 

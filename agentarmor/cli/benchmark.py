@@ -28,6 +28,35 @@ from agentarmor.db.benchmark_session import BenchmarkRepository
 benchmark_app = typer.Typer(help="Model security benchmarking")
 
 
+@benchmark_app.command("tools")
+def benchmark_tools(
+    config: Optional[Path] = typer.Option(Path("AgentArmor.toml"), "--config", "-c"),
+    suite: str = typer.Option("owasp-llm01", "--suite"),
+    targets: Optional[str] = typer.Option(
+        None, "--targets", help="Comma-separated targets: dvllm,localhost,corpus"
+    ),
+    output: Optional[Path] = typer.Option(None, "--output", "-o"),
+) -> None:
+    """Compare AgentArmor vs PyRIT, Garak, Promptfoo, Inspect AI on a shared corpus."""
+    from agentarmor.benchmark.tools_comparison.runner import format_comparison_table, run_tools_comparison
+
+    base_cfg = load_config(config if config.exists() else None)
+    target_list = [t.strip() for t in targets.split(",") if t.strip()] if targets else ["corpus"]
+
+    async def _run() -> None:
+        completed = await run_tools_comparison(base_cfg, suite=suite, targets=target_list)
+        table = format_comparison_table(completed)
+        typer.echo(table)
+        if output:
+            import json
+
+            output.parent.mkdir(parents=True, exist_ok=True)
+            output.write_text(json.dumps(completed.model_dump(mode="json"), indent=2), encoding="utf-8")
+            typer.echo(f"Report: {output}")
+
+    asyncio.run(_run())
+
+
 @benchmark_app.callback(invoke_without_command=True)
 def benchmark(
     ctx: typer.Context,

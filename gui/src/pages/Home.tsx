@@ -11,6 +11,7 @@ import {
   GlobeIcon,
   PlugIcon,
   ServerIcon,
+  ShieldIcon,
 } from "../components/icons";
 
 const TILES: {
@@ -34,6 +35,23 @@ export default function Home() {
         title="Security validation"
         subtitle="Run structured probes against AI endpoints, providers, agents, and retrieval systems. Results include SARIF, HTML, PDF, and JSON exports."
       />
+
+      <section className="mb-10 rounded-xl border border-brand-500/30 bg-gradient-to-br from-brand-500/10 to-surface-raised p-6 shadow-panel sm:flex sm:items-center sm:justify-between">
+        <div className="flex gap-4">
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-brand-500/20 text-brand-600 dark:text-brand-400">
+            <ShieldIcon className="h-6 w-6" />
+          </div>
+          <div>
+            <h2 className="text-base font-semibold text-ink-primary">Test my chatbot</h2>
+            <p className="mt-1 max-w-md text-sm text-ink-muted">
+              Plain-language wizard — connect your chatbot and run jailbreak, leak, and policy probes with offline or cloud-enhanced analysis.
+            </p>
+          </div>
+        </div>
+        <Link to="/chatbot" className="mt-4 block sm:mt-0">
+          <Button>Start chatbot test</Button>
+        </Link>
+      </section>
 
       <section>
         <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-ink-muted">Scan targets</h2>
@@ -59,9 +77,9 @@ export default function Home() {
 
       <section className="mt-10 rounded-xl border border-surface-border bg-surface-raised p-5 shadow-panel sm:flex sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-sm font-semibold text-ink-primary">Model benchmark</h2>
+          <h2 className="text-sm font-semibold text-ink-primary">Benchmarks</h2>
           <p className="mt-1 text-sm text-ink-muted">
-            Compare pass rates across providers using the OWASP LLM probe suite.
+            Model leaderboards and tools comparison (AgentArmor vs PyRIT, Garak, Promptfoo, Inspect AI).
           </p>
         </div>
         <Link to="/benchmark" className="mt-4 block sm:mt-0">

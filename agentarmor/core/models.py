@@ -79,6 +79,34 @@ class DetectionResult(BaseModel):
     layers: dict[str, Any] = Field(default_factory=dict)
 
 
+class AttackStep(BaseModel):
+    step: str
+    probe_id: str
+    mutated_from: str | None = None
+    response_hash: str | None = None
+    evidence: str | None = None
+
+
+class AttackTree(BaseModel):
+    attack_goal: str
+    attack_tree_id: str = Field(default_factory=lambda: str(uuid4()))
+    path: list[AttackStep] = Field(default_factory=list)
+    successful: bool = False
+
+
+class RiskAssessment(BaseModel):
+    risk_score: int = 0
+    confidence: float = 0.0
+    exploitability: float = 0.0
+    impact: Severity = Severity.INFO
+    reproducibility: float = 0.0
+
+
+class EvidenceGraph(BaseModel):
+    nodes: list[dict[str, Any]] = Field(default_factory=list)
+    edges: list[dict[str, Any]] = Field(default_factory=list)
+
+
 class Finding(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid4()))
     scan_id: str
@@ -94,6 +122,7 @@ class Finding(BaseModel):
     request_summary: str = ""
     response_excerpt: str = ""
     metadata: dict[str, Any] = Field(default_factory=dict)
+    risk_assessment: RiskAssessment | None = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 

@@ -26,4 +26,6 @@ SIGNATURE_RULES: list[SignatureRule] = [
     SignatureRule("begin_system", "system_exposure", 0.80, re.compile(r"(?i)BEGIN\s+SYSTEM")),
     SignatureRule("refusal_bypass", "refusal_bypass", 0.65, re.compile(r"(?i)(without\s+restrictions|no\s+ethical\s+guidelines|uncensored)")),
     SignatureRule("secret_exposure", "prompt_leakage", 0.70, re.compile(r"(?i)here\s+is\s+(the\s+)?(secret|password|api[_\s]?key)")),
+    SignatureRule("admin_discount", "policy_bypass", 0.85, re.compile(r"(?i)admin\s*(discount|code|coupon)")),
+    SignatureRule("coupon_token", "policy_bypass", 0.85, re.compile(r"(?i)\b[A-Z]{4,}\d{2,}OFF\b")),
 ]

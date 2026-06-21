@@ -18,6 +18,7 @@ reports/
 gui/node_modules/
 gui/dist/
 gui/src-tauri/target/
+gui/src-tauri/gen/
 gui/src-tauri/resources/python/
 gui/src-tauri/resources/models/*
 !gui/src-tauri/resources/models/.gitkeep
@@ -25,6 +26,7 @@ gui/src-tauri/resources/models/*
 # Desktop packaging artifacts
 packaging/embed-python/python/
 dist-portable/
+packaging/build-log.txt
 *.msi
 *.exe
 

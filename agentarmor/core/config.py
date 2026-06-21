@@ -39,6 +39,12 @@ def _substitute_env(value: Any) -> Any:
 class EndpointEngineConfig(BaseModel):
     rate_limit_rps: float = 5.0
     timeout_s: float = 30.0
+    profile: str = "auto"  # auto | openai | openai_compat | custom | message_reply | ...
+    detected_profile: str | None = None
+    request_template: str | None = None
+    response_path: str | None = None
+    extra_body: dict[str, Any] = Field(default_factory=dict)
+    http_method: str = "POST"
 
 
 class ProviderEngineConfig(BaseModel):
@@ -72,9 +78,66 @@ class FusionWeightsConfig(BaseModel):
     l4: float = 0.4
 
 
+class AgenticConfig(BaseModel):
+    enabled: bool = False
+    provider: str = "openai"
+    model: str = "gpt-4o-mini"
+    api_key: str = ""
+    api_key_env: str = "AGENTARMOR_ANALYSIS_API_KEY"
+    max_findings_per_scan: int = 20
+    temperature: float = 0.1
+    max_output_tokens: int = 800
+
+
+class SelfPlayConfig(BaseModel):
+    enabled: bool = False
+    max_rounds: int = 20
+    stop_on_success: bool = True
+    defender_enabled: bool = False
+    discovery_enabled: bool = True
+    goals: list[str] = Field(
+        default_factory=lambda: ["extract_system_prompt", "bypass_safety"]
+    )
+
+
+class L0AttackConfig(BaseModel):
+    enabled: bool = True
+    max_variants_per_goal: int = 100
+    cloud_mutations_enabled: bool = True
+    cloud_mutations_per_goal: int = 10
+    goals: list[str] = Field(
+        default_factory=lambda: [
+            "extract_system_prompt",
+            "bypass_safety",
+            "exfiltrate_secrets",
+            "trigger_tool_abuse",
+            "poison_memory",
+        ]
+    )
+    suites: list[str] = Field(
+        default_factory=lambda: [
+            "prompt_leak",
+            "model_theft",
+            "memory_poison",
+            "poisoning",
+        ]
+    )
+
+
 class DetectionConfig(BaseModel):
     mode: str = "local"  # local | api | hybrid
+    analysis_mode: str = "offline"  # offline | cloud
+    l0: L0AttackConfig = Field(default_factory=L0AttackConfig)
+    self_play: SelfPlayConfig = Field(default_factory=SelfPlayConfig)
     api_url: str = "http://127.0.0.1:8787"
+    agentic: AgenticConfig = Field(default_factory=AgenticConfig)
+    redteam_plugins: list[str] = Field(
+        default_factory=lambda: [
+            "security:prompt-injection",
+            "security:disclosure",
+            "trust:refusal-bypass",
+        ]
+    )
     l1_enabled: bool = True
     l2_enabled: bool = True
     l3_enabled: bool = True
@@ -163,9 +226,115 @@ def load_config(path: Path | None = None) -> AppConfig:
         module_agent=AgentModuleConfig(**module_section.get("agent", {})),
         module_mcp=McpModuleConfig(**module_section.get("mcp", {})),
         module_rag=RagModuleConfig(**module_section.get("rag", {})),
-        detection=DetectionConfig(**raw.get("detection", {})),
+        detection=_load_detection_config(raw.get("detection", {})),
         reporting=ReportingConfig(**raw.get("reporting", {})),
     )
+
+
+def _load_detection_config(raw: object) -> DetectionConfig:
+    if not isinstance(raw, dict) or not raw:
+        return DetectionConfig()
+    data = dict(raw)
+    agentic_raw = data.pop("agentic", None)
+    if isinstance(agentic_raw, dict):
+        data["agentic"] = AgenticConfig(**agentic_raw)
+    l0_raw = data.pop("l0", None)
+    if isinstance(l0_raw, dict):
+        data["l0"] = L0AttackConfig(**l0_raw)
+    self_play_raw = data.pop("self_play", None)
+    if isinstance(self_play_raw, dict):
+        data["self_play"] = SelfPlayConfig(**self_play_raw)
+    return DetectionConfig(**data)
+
+
+def apply_analysis_options(
+    config: AppConfig,
+    *,
+    analysis_mode: str | None = None,
+    analysis_provider: str | None = None,
+    analysis_model: str | None = None,
+    analysis_api_key: str | None = None,
+    auth_token: str | None = None,
+) -> AppConfig:
+    if analysis_mode:
+        config.detection.analysis_mode = analysis_mode
+        config.detection.agentic.enabled = analysis_mode == "cloud"
+    if analysis_provider:
+        config.detection.agentic.provider = analysis_provider
+    if analysis_model:
+        config.detection.agentic.model = analysis_model
+    if analysis_api_key:
+        config.detection.agentic.api_key = analysis_api_key
+    elif config.detection.analysis_mode == "cloud":
+        env_key = os.environ.get(config.detection.agentic.api_key_env, "")
+        if env_key:
+            config.detection.agentic.api_key = env_key
+    if auth_token:
+        config.target.headers = dict(config.target.headers or {})
+        if auth_token.lower().startswith("bearer "):
+            config.target.headers["Authorization"] = auth_token
+        else:
+            config.target.headers["Authorization"] = f"Bearer {auth_token}"
+    return config
+
+
+def apply_endpoint_options(
+    config: AppConfig,
+    *,
+    endpoint_profile: str | None = None,
+    request_template: str | None = None,
+    response_path: str | None = None,
+    extra_body: dict[str, Any] | None = None,
+    redteam_plugins: list[str] | None = None,
+) -> AppConfig:
+    if endpoint_profile:
+        config.engine_endpoint.profile = endpoint_profile
+        config.engine_endpoint.detected_profile = None
+    if request_template is not None:
+        config.engine_endpoint.request_template = request_template
+        if endpoint_profile is None:
+            config.engine_endpoint.profile = "custom"
+    if response_path is not None:
+        config.engine_endpoint.response_path = response_path
+    if extra_body:
+        config.engine_endpoint.extra_body = dict(extra_body)
+    if redteam_plugins:
+        config.detection.redteam_plugins = list(redteam_plugins)
+    return config
+
+
+def apply_redteam_options(
+    config: AppConfig,
+    *,
+    l0_enabled: bool | None = None,
+    max_variants_per_goal: int | None = None,
+    l0_suites: list[str] | None = None,
+    cloud_mutations_enabled: bool | None = None,
+    self_play_enabled: bool | None = None,
+    self_play_max_rounds: int | None = None,
+    self_play_stop_on_success: bool | None = None,
+    self_play_discovery_enabled: bool | None = None,
+    self_play_defender_enabled: bool | None = None,
+) -> AppConfig:
+    if l0_enabled is not None:
+        config.detection.l0.enabled = l0_enabled
+    if max_variants_per_goal is not None:
+        config.detection.l0.max_variants_per_goal = max(1, max_variants_per_goal)
+    if l0_suites is not None:
+        config.detection.l0.suites = list(l0_suites)
+    if cloud_mutations_enabled is not None:
+        config.detection.l0.cloud_mutations_enabled = cloud_mutations_enabled
+    if self_play_enabled is not None:
+        config.detection.self_play.enabled = self_play_enabled
+    if self_play_max_rounds is not None:
+        config.detection.self_play.max_rounds = max(1, self_play_max_rounds)
+    if self_play_stop_on_success is not None:
+        config.detection.self_play.stop_on_success = self_play_stop_on_success
+    if self_play_discovery_enabled is not None:
+        config.detection.self_play.discovery_enabled = self_play_discovery_enabled
+    if self_play_defender_enabled is not None:
+        config.detection.self_play.defender_enabled = self_play_defender_enabled
+    return config
 
 
 def merge_cli_target(

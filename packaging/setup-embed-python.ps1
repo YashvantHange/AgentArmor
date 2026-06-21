@@ -44,13 +44,31 @@ Remove-Item $getPip -ErrorAction SilentlyContinue
 # Install agentarmor into embed environment
 Push-Location $RepoRoot
 try {
-    & "$EmbedRoot\python.exe" -m pip install --upgrade pip wheel
-    if ($LASTEXITCODE -ne 0) { throw "pip upgrade failed with exit code $LASTEXITCODE" }
+    & "$EmbedRoot\python.exe" -m pip install --upgrade pip wheel setuptools hatchling
+    if ($LASTEXITCODE -ne 0) { throw "pip bootstrap failed with exit code $LASTEXITCODE" }
+
     if ($WheelPath -and (Test-Path $WheelPath)) {
         Write-Host "Installing prebuilt wheel: $WheelPath"
         & "$EmbedRoot\python.exe" -m pip install $WheelPath --no-warn-script-location
     } else {
-        & "$EmbedRoot\python.exe" -m pip install "." --no-warn-script-location
+        $dist = Join-Path $RepoRoot "dist"
+        $wheel = Get-ChildItem -Path $dist -Filter "agentarmor-*.whl" -ErrorAction SilentlyContinue |
+            Sort-Object LastWriteTime -Descending |
+            Select-Object -First 1
+        if (-not $wheel) {
+            Write-Host "Building wheel with system Python..."
+            python -m pip install --upgrade build hatchling -q
+            if ($LASTEXITCODE -ne 0) { throw "system pip build tools failed" }
+            python -m build --wheel
+            if ($LASTEXITCODE -ne 0) { throw "python -m build --wheel failed" }
+            $wheel = Get-ChildItem -Path $dist -Filter "agentarmor-*.whl" |
+                Sort-Object LastWriteTime -Descending |
+                Select-Object -First 1
+        }
+        if (-not $wheel) { throw "No agentarmor wheel found in dist/" }
+        Write-Host "Installing wheel into embed Python: $($wheel.FullName)"
+        $wheelWithExtras = "$($wheel.FullName)[ml]"
+        & "$EmbedRoot\python.exe" -m pip install $wheelWithExtras --no-warn-script-location
     }
     if ($LASTEXITCODE -ne 0) { throw "pip install agentarmor failed with exit code $LASTEXITCODE" }
     $agentarmor = Join-Path $EmbedRoot "Scripts\agentarmor.exe"

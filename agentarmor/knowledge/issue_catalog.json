@@ -1,0 +1,257 @@
+{
+  "_default": {
+    "plain_title": "Security issue detected",
+    "what_happened": "{subject} exhibited behavior that matched a security probe failure.",
+    "why_it_matters": "Attackers may exploit this to bypass policies, leak data, or abuse connected systems.",
+    "remediation": [
+      "Harden system prompts and safety instructions.",
+      "Add input/output filtering and policy enforcement.",
+      "Re-run AgentArmor after fixes."
+    ]
+  },
+  "l1.ignore-instructions": {
+    "plain_title": "Instruction override succeeded",
+    "what_happened": "{subject} followed a prompt asking it to ignore prior safety instructions.",
+    "why_it_matters": "Jailbreaks can disable content policies and enable harmful or unauthorized outputs.",
+    "remediation": [
+      "Strengthen system prompt anchoring and refusal training.",
+      "Detect instruction-override patterns in user input.",
+      "Layer policy checks after model output."
+    ]
+  },
+  "l1.reveal-system-prompt": {
+    "plain_title": "System instructions may be exposed",
+    "what_happened": "{subject} revealed internal system prompt or hidden instructions when asked.",
+    "why_it_matters": "Leaked prompts help attackers craft targeted bypass attacks.",
+    "remediation": [
+      "Instruct the model never to repeat system prompts.",
+      "Filter responses for policy text leakage.",
+      "Separate secrets from prompt text."
+    ]
+  },
+  "l1.hidden-rules": {
+    "plain_title": "Hidden rules disclosed",
+    "what_happened": "{subject} disclosed hidden rules or internal policies.",
+    "why_it_matters": "Policy disclosure weakens defense-in-depth and aids social engineering.",
+    "remediation": [
+      "Minimize sensitive policy detail in prompts.",
+      "Add post-generation redaction for policy keywords."
+    ]
+  },
+  "l1.act-as-root": {
+    "plain_title": "Privilege escalation via roleplay",
+    "what_happened": "{subject} accepted a privileged administrator role without authorization.",
+    "why_it_matters": "Roleplay jailbreaks can bypass safety and access controls.",
+    "remediation": [
+      "Reject unauthorized role claims in system policy.",
+      "Validate capabilities server-side, not in the model only."
+    ]
+  },
+  "l2.encoding-base64": {
+    "plain_title": "Encoding bypass detected",
+    "what_happened": "{subject} processed an encoded payload that attempted to bypass filters.",
+    "why_it_matters": "Attackers use encoding to evade naive input filters.",
+    "remediation": [
+      "Normalize and decode inputs before safety checks.",
+      "Scan decoded content with the same policies as plain text."
+    ]
+  },
+  "l2.roleplay": {
+    "plain_title": "Roleplay jailbreak detected",
+    "what_happened": "{subject} complied with a fictional unrestricted persona (e.g. DAN-style).",
+    "why_it_matters": "Persona attacks are a common path to policy violation.",
+    "remediation": [
+      "Train refusal for known jailbreak personas.",
+      "Detect roleplay framing in user messages."
+    ]
+  },
+  "l2.translation": {
+    "plain_title": "Translation injection bypass",
+    "what_happened": "{subject} followed malicious instructions embedded in a translation request.",
+    "why_it_matters": "Indirect injection via multilingual prompts bypasses English-only filters.",
+    "remediation": [
+      "Apply safety checks after translation.",
+      "Treat translated content as untrusted user input."
+    ]
+  },
+  "l2.indirect-injection": {
+    "plain_title": "Indirect prompt injection",
+    "what_happened": "{subject} executed instructions hidden inside seemingly benign content.",
+    "why_it_matters": "Indirect injection is common in RAG and tool-augmented systems.",
+    "remediation": [
+      "Sanitize retrieved documents and tool outputs.",
+      "Separate data context from instruction channels."
+    ]
+  },
+  "l2.context-split": {
+    "plain_title": "Context-split attack succeeded",
+    "what_happened": "{subject} was manipulated by instructions split across message boundaries.",
+    "why_it_matters": "Split payloads evade per-message scanners.",
+    "remediation": [
+      "Evaluate full conversation context for policy checks.",
+      "Limit multi-part instruction assembly."
+    ]
+  },
+  "l3.crescendo": {
+    "plain_title": "Multi-turn escalation attack",
+    "what_happened": "{subject} was gradually manipulated across turns into unsafe behavior.",
+    "why_it_matters": "Crescendo attacks exploit conversational trust over multiple turns.",
+    "remediation": [
+      "Apply cumulative conversation risk scoring.",
+      "Reset or constrain context after sensitive topics."
+    ]
+  },
+  "l3.gradual-escalation": {
+    "plain_title": "Gradual policy erosion",
+    "what_happened": "{subject} slowly drifted from safe topics into policy violations.",
+    "why_it_matters": "Slow escalation bypasses single-turn defenses.",
+    "remediation": [
+      "Monitor conversation trajectory, not only last turn.",
+      "Enforce hard stops on restricted topics."
+    ]
+  },
+  "l3.tap": {
+    "plain_title": "Tree-of-attacks style manipulation",
+    "what_happened": "{subject} succumbed to a structured multi-step adversarial conversation.",
+    "why_it_matters": "Automated attack trees can systematically find weaknesses.",
+    "remediation": [
+      "Use session-level policy enforcement.",
+      "Rate-limit and flag repetitive adversarial patterns."
+    ]
+  },
+  "l3.goat": {
+    "plain_title": "Goal-oriented adversarial probe failed",
+    "what_happened": "{subject} pursued an attacker goal across conversational turns.",
+    "why_it_matters": "Goal-driven attacks mirror real-world social engineering.",
+    "remediation": [
+      "Align model with fixed safety goals per session.",
+      "Block tool actions triggered by conversational manipulation."
+    ]
+  },
+  "agent.tool-abuse": {
+    "plain_title": "Unauthorized tool invocation",
+    "what_happened": "The agent invoked a forbidden or dangerous tool.",
+    "why_it_matters": "Tool abuse can delete data, exfiltrate secrets, or trigger payments.",
+    "remediation": [
+      "Enforce tool allowlists at runtime.",
+      "Require human approval for destructive actions."
+    ]
+  },
+  "agent.permission-escalation": {
+    "plain_title": "Agent permission escalation",
+    "what_happened": "The agent accessed elevated tools beyond its configured permissions.",
+    "why_it_matters": "Escalation enables lateral movement across integrated systems.",
+    "remediation": [
+      "Scope tools per agent role with least privilege.",
+      "Audit tool grants in agent configuration."
+    ]
+  },
+  "agent.secret-extraction": {
+    "plain_title": "Secrets leaked via agent",
+    "what_happened": "The agent exposed canary secrets or credentials in responses or tool args.",
+    "why_it_matters": "Credential leakage leads to account compromise.",
+    "remediation": [
+      "Never pass secrets in prompts or tool parameters.",
+      "Redact sensitive patterns in agent outputs."
+    ]
+  },
+  "agent.memory-poisoning": {
+    "plain_title": "Agent memory poisoning",
+    "what_happened": "Malicious instructions persisted in agent memory across turns.",
+    "why_it_matters": "Poisoned memory enables long-lived compromise.",
+    "remediation": [
+      "Validate memory writes against policy.",
+      "Expire or sandbox untrusted memory entries."
+    ]
+  },
+  "agent.workflow-hijacking": {
+    "plain_title": "Agent workflow hijacked",
+    "what_happened": "The agent executed a dangerous cross-tool workflow chain.",
+    "why_it_matters": "Chained tools multiply impact of a single bypass.",
+    "remediation": [
+      "Define allowed workflows explicitly.",
+      "Block sensitive tool sequences without approval."
+    ]
+  },
+  "mcp.tool-enumeration": {
+    "plain_title": "Hidden MCP tools discovered",
+    "what_happened": "The MCP server exposed tools not listed in public discovery.",
+    "why_it_matters": "Hidden tools expand attack surface unexpectedly.",
+    "remediation": [
+      "Register all tools in discovery.",
+      "Disable undeclared tool endpoints."
+    ]
+  },
+  "mcp.prompt-injection": {
+    "plain_title": "MCP prompt injection via parameters",
+    "what_happened": "The MCP server accepted injected instructions in tool parameters.",
+    "why_it_matters": "Tool parameters are a common indirect injection vector.",
+    "remediation": [
+      "Sanitize and validate all tool arguments.",
+      "Separate tool data from instruction parsing."
+    ]
+  },
+  "mcp.unsafe-parameters": {
+    "plain_title": "Unsafe MCP parameters accepted",
+    "what_happened": "The MCP server processed dangerous parameters (e.g. path traversal).",
+    "why_it_matters": "Parameter abuse can read or write arbitrary files.",
+    "remediation": [
+      "Validate paths and arguments with strict allowlists.",
+      "Run MCP servers with minimal filesystem permissions."
+    ]
+  },
+  "mcp.cross-tool-abuse": {
+    "plain_title": "Cross-tool MCP abuse",
+    "what_happened": "One MCP tool was used to poison or trigger another dangerous tool.",
+    "why_it_matters": "Tool chaining bypasses per-tool safety assumptions.",
+    "remediation": [
+      "Enforce workflow policies across tools.",
+      "Isolate high-risk tools behind approval gates."
+    ]
+  },
+  "mcp.data-leakage": {
+    "plain_title": "Sensitive data in MCP responses",
+    "what_happened": "The MCP server returned sensitive data in tool responses.",
+    "why_it_matters": "Leaked tool output can expose secrets to the model and user.",
+    "remediation": [
+      "Redact sensitive fields in tool responses.",
+      "Scope tool output to minimum necessary data."
+    ]
+  },
+  "rag.document-poisoning": {
+    "plain_title": "Poisoned document retrieved",
+    "what_happened": "The RAG corpus contains injected instructions that surface in retrieval.",
+    "why_it_matters": "Poisoned documents hijack model behavior via context.",
+    "remediation": [
+      "Validate and sanitize corpus uploads.",
+      "Detect instruction-like patterns in documents."
+    ]
+  },
+  "rag.retrieval-manipulation": {
+    "plain_title": "Retrieval manipulation succeeded",
+    "what_happened": "A crafted query retrieved sensitive documents inappropriately.",
+    "why_it_matters": "Query crafting bypasses access intent for private data.",
+    "remediation": [
+      "Apply access controls per document segment.",
+      "Filter retrieval results by user authorization."
+    ]
+  },
+  "rag.context-override": {
+    "plain_title": "Context override in retrieved text",
+    "what_happened": "Retrieved chunks contain instructions to override system behavior.",
+    "why_it_matters": "Context injection is a primary RAG attack path.",
+    "remediation": [
+      "Strip instruction-like patterns from retrieved text.",
+      "Label retrieved content as untrusted data."
+    ]
+  },
+  "rag.embedding-weakness": {
+    "plain_title": "Embedding collision weakness",
+    "what_happened": "Near-duplicate texts collide in embedding space, enabling confusion attacks.",
+    "why_it_matters": "Weak embeddings allow adversarial retrieval manipulation.",
+    "remediation": [
+      "Use stronger embedders and re-ranking.",
+      "Monitor retrieval similarity thresholds."
+    ]
+  }
+}

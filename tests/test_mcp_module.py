@@ -18,7 +18,7 @@ def mcp_stdio_target():
 
 
 def test_mcp_probe_count():
-    assert len(get_mcp_probes()) == 5
+    assert len(get_mcp_probes()) == 15
 
 
 @pytest.mark.asyncio

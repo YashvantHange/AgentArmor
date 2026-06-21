@@ -1,6 +1,6 @@
 use std::process::{Child, Command, Stdio};
 use std::sync::Mutex;
-use std::time::Duration;
+use std::thread;
 use tauri::Manager;
 
 static SIDECAR: Mutex<Option<Child>> = Mutex::new(None);
@@ -10,7 +10,8 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .setup(|app| {
-            spawn_sidecar(app.handle());
+            let handle = app.handle().clone();
+            thread::spawn(move || spawn_sidecar(&handle));
             Ok(())
         })
         .on_window_event(|_window, event| {
@@ -24,28 +25,9 @@ pub fn run() {
 
 fn spawn_sidecar(handle: &tauri::AppHandle) {
     let port = std::env::var("AGENTARMOR_PORT").unwrap_or_else(|_| "8787".into());
-    let model_dir = resolve_model_dir(handle);
+    let mut cmd = build_sidecar_command(handle, &port);
 
-    let mut cmd = if let Some(exe) = resolve_agentarmor_exe(handle) {
-        let mut c = Command::new(exe);
-        c.args(["serve", "--port", &port, "--host", "127.0.0.1"]);
-        c
-    } else {
-        let python = resolve_python(handle);
-        let mut c = Command::new(&python);
-        c.args([
-            "-m",
-            "agentarmor.cli.main",
-            "serve",
-            "--port",
-            &port,
-            "--host",
-            "127.0.0.1",
-        ]);
-        c
-    };
-
-    if let Some(dir) = model_dir {
+    if let Some(dir) = resolve_model_dir(handle) {
         cmd.args(["--model-dir", &dir]);
     }
     if let Some(data_dir) = resolve_data_dir(handle) {
@@ -53,31 +35,65 @@ fn spawn_sidecar(handle: &tauri::AppHandle) {
     }
 
     cmd.stdout(Stdio::null()).stderr(Stdio::null());
+    hide_console_window(&mut cmd);
+
     if let Ok(child) = cmd.spawn() {
         let mut guard = SIDECAR.lock().unwrap();
         *guard = Some(child);
-        let _ = wait_for_health(&port, 60);
     }
 }
 
-fn resolve_agentarmor_exe(handle: &tauri::AppHandle) -> Option<String> {
-    handle
-        .path()
-        .resource_dir()
-        .ok()
-        .map(|p| p.join("python").join("Scripts").join("agentarmor.exe"))
-        .filter(|p| p.exists())
-        .map(|p| p.to_string_lossy().into_owned())
+fn build_sidecar_command(handle: &tauri::AppHandle, port: &str) -> Command {
+    let host = "127.0.0.1";
+    if let Some(python) = resolve_embedded_python(handle) {
+        let mut cmd = Command::new(python);
+        cmd.args([
+            "-m",
+            "agentarmor.cli.main",
+            "serve",
+            "--port",
+            port,
+            "--host",
+            host,
+        ]);
+        return cmd;
+    }
+
+    let python = std::env::var("AGENTARMOR_PYTHON").unwrap_or_else(|_| "python".into());
+    let mut cmd = Command::new(&python);
+    cmd.args([
+        "-m",
+        "agentarmor.cli.main",
+        "serve",
+        "--port",
+        port,
+        "--host",
+        host,
+    ]);
+    cmd
 }
 
-fn resolve_python(handle: &tauri::AppHandle) -> String {
-    if let Ok(res) = handle.path().resource_dir() {
-        let embedded = res.join("python").join("python.exe");
-        if embedded.exists() {
-            return embedded.to_string_lossy().into_owned();
-        }
+#[cfg(windows)]
+fn hide_console_window(cmd: &mut Command) {
+    use std::os::windows::process::CommandExt;
+    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+    cmd.creation_flags(CREATE_NO_WINDOW);
+}
+
+#[cfg(not(windows))]
+fn hide_console_window(_cmd: &mut Command) {}
+
+fn resolve_embedded_python(handle: &tauri::AppHandle) -> Option<String> {
+    let res = handle.path().resource_dir().ok()?;
+    let pythonw = res.join("python").join("pythonw.exe");
+    if pythonw.exists() {
+        return Some(pythonw.to_string_lossy().into_owned());
     }
-    std::env::var("AGENTARMOR_PYTHON").unwrap_or_else(|_| "python".into())
+    let python = res.join("python").join("python.exe");
+    if python.exists() {
+        return Some(python.to_string_lossy().into_owned());
+    }
+    None
 }
 
 fn resolve_model_dir(handle: &tauri::AppHandle) -> Option<String> {
@@ -91,8 +107,13 @@ fn resolve_model_dir(handle: &tauri::AppHandle) -> Option<String> {
 }
 
 fn resolve_data_dir(handle: &tauri::AppHandle) -> Option<String> {
-    let portable = std::env::var("AGENTARMOR_PORTABLE").ok().as_deref() == Some("1")
-        || std::env::var("AGENTARMOR_DATA_DIR").is_ok();
+    if std::env::var("AGENTARMOR_PORTABLE").ok().as_deref() == Some("1")
+        || std::env::var("AGENTARMOR_DATA_DIR").is_ok()
+    {
+        if let Ok(dir) = std::env::var("AGENTARMOR_DATA_DIR") {
+            return Some(dir);
+        }
+    }
 
     if let Ok(exe) = std::env::current_exe() {
         if let Some(dir) = exe.parent() {
@@ -104,23 +125,7 @@ fn resolve_data_dir(handle: &tauri::AppHandle) -> Option<String> {
         }
     }
 
-    if portable {
-        if let Ok(dir) = std::env::var("AGENTARMOR_DATA_DIR") {
-            return Some(dir);
-        }
-    }
     None
-}
-
-fn wait_for_health(port: &str, max_secs: u64) -> bool {
-    let url = format!("http://127.0.0.1:{port}/health");
-    for _ in 0..max_secs * 2 {
-        if ureq::get(&url).call().map(|r| r.status() == 200).unwrap_or(false) {
-            return true;
-        }
-        std::thread::sleep(Duration::from_millis(500));
-    }
-    false
 }
 
 fn kill_sidecar() {

@@ -1,83 +1,76 @@
 # AgentArmor
 
-AI Security Validation Platform — scan LLM APIs, cloud providers, local models, produce SARIF/HTML, gate CI on HIGH/CRITICAL.
+**The Nuclei of AI Security** — continuously test, audit, and red-team LLM APIs, agents, MCP servers, and RAG systems.
 
-## Install
+AgentArmor runs structured security probes against your AI stack, scores findings with an enterprise risk model (0–100), maps results to **OWASP LLM Top 10**, and exports reports for developers and security teams (SARIF, HTML, PDF, CSV).
 
-```bash
-pip install -e ".[dev]"
+**Latest release:** [v1.2.0](https://github.com/YashvantHange/AgentArmor/releases/tag/v1.2.0) · [Changelog](CHANGELOG.md)
 
-# Offline local model scanning (.gguf / HuggingFace)
-pip install -e ".[local]"
+---
+
+## What AgentArmor does
+
+| Capability | Description |
+|------------|-------------|
+| **Endpoint scanning** | Test any OpenAI-compatible or auto-detected chat API URL |
+| **Cloud providers** | OpenAI, Anthropic, Gemini, and more via LiteLLM |
+| **Local models** | Offline scanning of `.gguf` and HuggingFace models |
+| **Agent / MCP / RAG** | Security probes for tool-calling agents, MCP servers, and retrieval pipelines |
+| **L0 adaptive attacks** | 100+ mutation variants per attack goal (jailbreak, prompt leak, exfiltration) |
+| **Self-play red teaming** | Attacker → Target → Judge loop to find vulns static probes miss |
+| **Benchmarking** | Compare models and tools (AgentArmor vs PyRIT, Garak, Promptfoo, Inspect AI) |
+| **Marketplace** | Install community probes and OWASP packs |
+| **Monitoring** | Scheduled rescans with drift detection |
+| **CI/CD** | GitHub Action + `agentarmor gate` for pipeline security gates |
+
+### Detection pipeline
+
+```
+Probes (L0–L3 + OWASP suites) → L1 Signatures → L2 Classifier → L3 Semantic → L4 Structural → L5 Judge (cloud)
+                                                                                    ↓
+                                                              Risk score · Attack trees · Evidence graph · Reports
 ```
 
-## Quick start
+---
 
-```bash
-# Scan an OpenAI-compatible endpoint
-agentarmor scan --url http://localhost:8000/v1/chat/completions
+## Do I need Python or Rust?
 
-# Cloud providers (LiteLLM)
-export OPENAI_API_KEY=sk-...
-agentarmor scan --provider openai
-agentarmor scan --provider anthropic
-agentarmor scan --provider gemini
+| How you use AgentArmor | Python required? | Rust required? |
+|------------------------|------------------|----------------|
+| **Windows installer (.exe / .msi)** | **No** — embedded runtime is bundled | **No** |
+| **PyPI** (`pip install agentarmor`) | **Yes** (3.10+) | **No** |
+| **Docker** | **No** on your machine | **No** |
+| **GitHub Action** | **No** on your machine | **No** |
+| **Build desktop app from source** | Yes | Yes (Tauri) |
+| **Optional Rust L1 speedup** | Yes | Yes (maturin) — falls back to Python if not built |
 
-# Local models (fully offline)
-agentarmor scan --model llama-3.gguf
-agentarmor scan --model ./models/qwen3
+**End users on Windows:** download the [release installer](https://github.com/YashvantHange/AgentArmor/releases/latest), double-click, and run scans — no Python, Rust, or Node install needed.
 
-# Agent security (OWASP LLM06)
-agentarmor scan --agent crewai --agent-config agent.toml
+**Developers / CLI users:** need Python 3.10+. Rust is only for compiling the optional native signature engine or building the Tauri GUI yourself.
 
-# MCP security
-agentarmor scan --mcp ./filesystem-mcp
-agentarmor scan --mcp http://localhost:3000/mcp
+---
 
-# RAG security
-agentarmor scan --rag ./corpus --embedder bge
+## Quick install
 
-# Use config file
-agentarmor scan --config AgentArmor.toml
+### Windows desktop (recommended)
 
-# PDF + CSV + HTML reports
-agentarmor scan --agent crewai --format pdf,csv,html -o ./reports/
+1. Download **`AgentArmor_1.2.0_x64-setup.exe`** or **`.msi`** from [Releases](https://github.com/YashvantHange/AgentArmor/releases/latest)
+2. Run the installer
+3. Open **AgentArmor** → choose scan type (API, Local Model, Agent, MCP, RAG, Benchmark)
+4. Configure target → run scan → review findings → export reports
 
-# Benchmark models (OWASP security suite)
-agentarmor benchmark --providers openai,anthropic,gemini --suite owasp
+Portable mode: place a file named `PORTABLE` next to the executable; data is stored in `./data/`.
 
-# Fail CI on high severity
-agentarmor gate --sarif findings.sarif --fail-on HIGH,CRITICAL
-```
-
-## Distribution
-
-| Channel | Usage |
-|---------|--------|
-| **PyPI** | `pip install agentarmor` or `pip install agentarmor[local]` |
-| **Docker** | `docker pull agentarmor/agentarmor` → `docker run -p 8787:8787 agentarmor/agentarmor` |
-| **GitHub Action** | `uses: agentarmor/scan@v1` with `url` or `provider` input |
-| **Desktop GUI** | Build with `packaging/build-installer.ps1` (Windows MSI) |
-| **Portable** | `packaging/build-portable.ps1` |
-
-### Desktop GUI
-
-```bash
-agentarmor serve          # sidecar API
-cd gui && npm install && npm run dev   # dev UI at :1420
-```
-
-See [gui/README.md](gui/README.md) for Tauri build instructions.
-
-### macOS
-
-No native Mac `.app` in v1.0.0 — use PyPI + CLI, or dev GUI. See **[docs/MAC.md](docs/MAC.md)**.
+### CLI (all platforms)
 
 ```bash
 pip install agentarmor
+
+# Optional: offline local model scanning
+pip install agentarmor[local]
+
+# One-time detection model download
 agentarmor models download
-agentarmor serve --port 8787
-# Optional GUI: cd gui && npm install && npm run dev  → http://localhost:1420
 ```
 
 ### Docker
@@ -87,18 +80,149 @@ docker build -f docker/Dockerfile -t agentarmor/agentarmor .
 docker run -p 8787:8787 agentarmor/agentarmor
 ```
 
-### GitHub Action
+---
 
-```yaml
-- uses: agentarmor/scan@v1
-  with:
-    url: https://api.example.com/v1/chat/completions
-    fail-on: HIGH,CRITICAL
+## Usage examples
+
+### Scan an API endpoint
+
+```bash
+# OpenAI-compatible chat API (use the POST URL from DevTools, not the HTML page)
+agentarmor scan --url http://localhost:8000/v1/chat/completions
+
+# Cloud provider
+export OPENAI_API_KEY=sk-...
+agentarmor scan --provider openai
+
+# With cloud enrichment + self-play red teaming
+agentarmor scan --url https://api.example.com/v1/chat/completions \
+  --analysis-mode cloud \
+  --self-play-enabled
 ```
 
-## Provider API keys
+### Scan agents, MCP, and RAG
 
-Set environment variables for your provider (LiteLLM standard):
+```bash
+agentarmor scan --agent crewai --agent-config agent.toml
+agentarmor scan --mcp ./filesystem-mcp
+agentarmor scan --rag ./corpus --embedder bge
+```
+
+### Local models (offline)
+
+```bash
+pip install agentarmor[local]
+agentarmor scan --model llama-3.gguf
+agentarmor scan --model ./models/qwen3
+```
+
+### Benchmarks
+
+```bash
+# Model leaderboard
+agentarmor benchmark --providers openai,anthropic,gemini --suite owasp
+
+# Tools comparison
+agentarmor benchmark tools --suite owasp-llm01 --targets corpus
+```
+
+### Ecosystem (v1.2)
+
+```bash
+agentarmor marketplace list
+agentarmor marketplace install roleplay-injection
+
+agentarmor monitor add "Daily API" --url https://api.example.com/v1/chat/completions --cron daily
+agentarmor monitor run <schedule-id>
+
+agentarmor dataset export -o research.jsonl --anonymize
+```
+
+### Reports and CI gates
+
+```bash
+agentarmor scan --url http://localhost:8000/v1/chat/completions --format html,sarif,pdf -o ./reports/
+agentarmor gate --sarif ./reports/findings.sarif --fail-on HIGH,CRITICAL
+```
+
+### Config file
+
+```bash
+agentarmor scan --config AgentArmor.toml
+```
+
+See [AgentArmor.toml](AgentArmor.toml) for endpoint profiles, L0 attack goals, detection mode, and plugin directories.
+
+---
+
+## Desktop GUI
+
+The Tauri v2 GUI includes:
+
+| Screen | Purpose |
+|--------|---------|
+| **Home** | Scan type picker + benchmark shortcut |
+| **Chatbot wizard** | Guided API scan with offline/cloud analysis |
+| **Scan progress** | Live SSE probe stream |
+| **Findings** | Risk scores, attack chains, evidence graph |
+| **Reports** | Export HTML, SARIF, PDF, CSV, JSON |
+| **Benchmark** | Model leaderboard + tools comparison |
+| **Marketplace** | Install community probes |
+| **Monitoring** | Schedules, drift alerts, dataset export |
+| **Settings** | L0, self-play, detection, API keys |
+
+For GUI development only (not required for end users):
+
+```bash
+agentarmor serve --port 8787
+cd gui && npm install && npm run dev   # http://localhost:1420
+```
+
+See [gui/README.md](gui/README.md) for Tauri build instructions.
+
+---
+
+## API server
+
+```bash
+agentarmor serve --port 8787
+```
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /health` | Sidecar status |
+| `POST /v1/scans` | Start a scan |
+| `GET /v1/scans/{id}` | Scan status + metadata |
+| `GET /v1/scans/{id}/events` | SSE live progress |
+| `GET /v1/findings` | List findings |
+| `POST /v1/benchmarks` | Run benchmark |
+| `GET /v1/marketplace/rules` | List marketplace packs |
+| `POST /v1/monitoring/schedules` | Create monitor schedule |
+| `POST /v1/datasets/export` | Export research JSONL |
+
+---
+
+## GitHub Action (CI/CD)
+
+```yaml
+name: AI Security Scan
+on: [push, pull_request]
+
+jobs:
+  agentarmor:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: YashvantHange/AgentArmor/action@v1
+        with:
+          url: https://api.example.com/v1/chat/completions
+          fail-on: HIGH,CRITICAL
+```
+
+See [action/action.yml](action/action.yml).
+
+---
+
+## Provider API keys
 
 | Provider | Environment variable |
 |----------|---------------------|
@@ -109,149 +233,65 @@ Set environment variables for your provider (LiteLLM standard):
 | Groq | `GROQ_API_KEY` |
 | Together | `TOGETHER_API_KEY` |
 | OpenRouter | `OPENROUTER_API_KEY` |
-| Bedrock | AWS credentials via `AWS_*` |
 | Azure | `AZURE_API_KEY`, `AZURE_API_BASE` |
+| Bedrock | `AWS_*` credentials |
 
-## Local model requirements
+Cloud enrichment and self-play require an API key for the analysis provider (configured in GUI Settings or `AgentArmor.toml`).
 
-Install the `[local]` extra:
-
-```bash
-pip install agentarmor[local]
-```
-
-| Format | Backend | Notes |
-|--------|---------|-------|
-| `.gguf` | llama-cpp-python | `gpu_layers` in config for GPU offload |
-| HuggingFace dir | transformers + torch (CPU) | Directory must contain `config.json` |
-
-```toml
-[target]
-type = "local"
-model = "llama-3.gguf"
-
-[engine.local]
-backend = "auto"
-gpu_layers = 0
-```
-
-## API server
-
-```bash
-agentarmor serve --port 8787
-```
-
-Endpoints:
-- `GET /health`
-- `POST /v1/scans`
-- `GET /v1/scans/{id}`
-- `GET /v1/findings`
-- `GET /v1/scans/{id}/events` (SSE)
-
-## GitHub Action
-
-See [action/action.yml](action/action.yml) and [.github/workflows/agentarmor-scan.yml](.github/workflows/agentarmor-scan.yml).
+---
 
 ## Custom probes
 
-Drop Python files in `probes/` — see [probes/custom_probe.py](probes/custom_probe.py).
+Author probes with the SDK and publish to your local marketplace:
+
+```bash
+agentarmor marketplace validate probes/custom_probe.py
+agentarmor marketplace publish probes/custom_probe.py --id my.probe --name "My Probe"
+```
+
+See [probes/custom_probe.py](probes/custom_probe.py) and `agentarmor.sdk.probe_sdk`.
+
+---
+
+## macOS
+
+No native Mac `.app` yet (Windows desktop first). Use PyPI + CLI or dev GUI:
+
+```bash
+pip install agentarmor
+agentarmor models download
+agentarmor serve --port 8787
+```
+
+See [docs/MAC.md](docs/MAC.md).
+
+---
 
 ## Development
 
 ```bash
+git clone https://github.com/YashvantHange/AgentArmor.git
+cd AgentArmor
+pip install -e ".[dev]"
 pytest
 ```
 
-## Milestone scope
-
-All **6 scan modes**: endpoint, provider, local model, agent, MCP, RAG.
-
-- Endpoint/API scanner (OpenAI-compatible)
-- **M3A:** Cloud provider scanner (LiteLLM) + local model scanner (.gguf / HF)
-- **M3B:** Agent + MCP + RAG security modules; PDF + CSV reporting
-- L1 single-prompt probes (4) + L2 mutation (5) + L3 multi-turn (4)
-- Module probes: Agent (5), MCP (5), RAG (4)
-- **M2A:** L1 signatures + L4 structural + fusion pipeline
-- JSON + SARIF + HTML + PDF + CSV reporting
-- SQLite persistence
-- Plugin loader
-
-### M3B: Agent, MCP, RAG scanning
+Optional native L1 engine (requires Rust):
 
 ```bash
-agentarmor scan --agent crewai --agent-config agent.toml --format pdf
-agentarmor scan --mcp ./filesystem-mcp
-agentarmor scan --rag ./corpus --embedder bge --format csv
+cd native/l1_signatures && pip install maturin && maturin develop --release
 ```
 
-Agent findings map to **OWASP LLM06** (Excessive Agency).
+Without Rust, the Python L1 fallback is used automatically.
 
-### M4: Model benchmarking
+Windows installer build (maintainers):
 
-Compare security posture across providers and local models:
-
-```bash
-agentarmor benchmark --provider openai --suite owasp
-agentarmor benchmark --providers openai,anthropic,gemini --suite owasp -o ./reports/
-agentarmor benchmark --model llama-3.gguf --suite owasp
-agentarmor benchmark --benchmark-config benchmark.toml --format json,html
+```powershell
+powershell -File packaging/build-installer.ps1
 ```
 
-Example terminal output:
+---
 
-```
-AgentArmor Benchmark — OWASP LLM Security Suite
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Model                    Pass Rate    Risk Score
-openai/gpt-3.5-turbo     94%          0.12
-anthropic/claude         89%          0.21
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-```
+## License
 
-API: `POST /v1/benchmarks`, `GET /v1/benchmarks/{id}`
-
-### M5: Desktop GUI + distribution
-
-- Tauri v2 GUI with 7 screens (Home, Scan, Progress, Findings, Reports, Benchmark, Settings)
-- Embedded Python sidecar on desktop launch
-- Windows installer + portable build scripts
-- Docker image with pre-baked models
-- PyPI + `agentarmor/scan@v1` GitHub Action
-- Release workflow on version tags
-
-### M3A: Provider + local model scanning
-
-```bash
-agentarmor scan --provider openai
-agentarmor scan --model ./models/qwen3 --format html
-pip install agentarmor[local]
-```
-
-### M2B: Full ML detection stack
-
-- L2 DeBERTa ONNX classifier (fallback: rule-based)
-- L3 BGE + FAISS semantic search (fallback: hash embeddings)
-- XGBoost meta scorer
-- Optional L5 LLM judge (`l5_enabled = true` + LiteLLM)
-- Detection API: `POST /v1/detection/analyze`
-- `agentarmor models download` / `agentarmor models status`
-
-```bash
-agentarmor serve
-curl -X POST http://127.0.0.1:8787/v1/detection/analyze \
-  -H "Content-Type: application/json" \
-  -d '{"text":"My system prompt is: secret"}'
-```
-
-Install ML extras: `pip install -e ".[dev]"` (includes faiss-cpu, xgboost, onnxruntime)
-
-```bash
-# Requires Rust + maturin
-cd native/l1_signatures
-pip install maturin
-maturin develop --release
-```
-
-Without Rust, the Python fallback is used automatically.
-**Latest release:** [v1.2.0](https://github.com/YashvantHange/AgentArmor/releases/tag/v1.2.0) — see [CHANGELOG.md](CHANGELOG.md).
-See [plans/](plans/) for the full roadmap.
+See repository license file.

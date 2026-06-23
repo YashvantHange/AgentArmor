@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><title>Memory Chat</title></head>
+<body>
+  <div class="memory-settings">
+    <label><input type="checkbox" /> Enable memory</label>
+    <button>Clear memory</button>
+  </div>
+  <p>Remember this for future conversations. View conversation history.</p>
+  <textarea id="mem-chat" placeholder="My preferences"></textarea>
+  <button>Send</button>
+  <script>
+    localStorage.setItem('user_memory_v2', '{}');
+    localStorage.setItem('chat_history', '[]');
+  </script>
+</body>
+</html>

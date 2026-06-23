@@ -79,6 +79,20 @@ class ScanRepository:
             records = query.order_by(FindingRecord.created_at.desc()).all()
             return [_finding_from_record(r) for r in records]
 
+    def count_web_scans_since(self, since: datetime) -> int:
+        with self._session_factory() as session:
+            records = (
+                session.query(ScanRecord)
+                .filter(ScanRecord.created_at >= since)
+                .all()
+            )
+            count = 0
+            for record in records:
+                meta = json.loads(record.metadata_json or "{}")
+                if meta.get("scan_kind") == "web":
+                    count += 1
+            return count
+
 
 def _finding_from_record(record: FindingRecord) -> Finding:
     from agentarmor.core.models import Decision, Severity

@@ -23,6 +23,8 @@ build-portable.ps1            → Unpacked portable folder
 | Installed | `%APPDATA%\AgentArmor\` (default) |
 | Portable | `./data/` next to `AgentArmor.exe` |
 
+Web scans require Playwright Chromium. The installer bundle includes browsers under `resources/playwright/` (~150–200 MB).
+
 Set portable via GUI Settings or env `AGENTARMOR_PORTABLE=1`.
 
 ## CI secrets (release.yml)

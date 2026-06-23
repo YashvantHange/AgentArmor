@@ -20,6 +20,7 @@ gui/dist/
 gui/src-tauri/target/
 gui/src-tauri/gen/
 gui/src-tauri/resources/python/
+gui/src-tauri/resources/playwright/
 gui/src-tauri/resources/models/*
 !gui/src-tauri/resources/models/.gitkeep
 

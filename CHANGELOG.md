@@ -4,6 +4,27 @@ All notable changes to AgentArmor are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Added — Multi-agent OWASP red team
+- New `agentarmor/redteam/` package: attack-graph planner, budget governor, capability-aware attack agents (Memory, A2A, MCP, RAG, baseline LLM01/07)
+- `scan_mode=multi_agent_redteam` on `/v1/scans` (requires cloud analysis API key)
+- Web scans: `multi_agentic` + `planner_enabled` runs `RedTeamOrchestrator` against discovered widgets
+- Findings include `confidence_score`, `reproducibility_score`, and `impact_score` via `RedTeamVerdict`
+- Config: `[redteam.budget]` and `[redteam.multi_agent]` in `AgentArmor.toml`
+- GUI: "Multi-agent red team" toggle (API scans), renamed cloud analysis labels
+- Tests: `test_redteam_*.py` (quality gates, per-agent, regression); `docs/REDTEAM_QUALITY.md`
+- 13 skill YAML bundles + dedicated LLM01–LLM10, Memory, A2A, MCP agent classes with registry
+
+### Added — Chatbot URL Scanner (Part 4)
+- Enterprise `manual_session` auth: headed browser login, encrypted local session storage (24h TTL)
+- `POST /v1/web-scans/prepare-session` and `POST /v1/web-scans/{id}/continue` API flow
+- LLM attack planner (`planner_enabled`) for multi-agentic scans with cloud API key
+- Multi-turn memory probe (`web.memory.poison-verify`) without page reload between turns
+- Daily web scan rate limiting via `webscan.max_scans_per_day`
+- HTML reports: attack plan summary (rule-based + LLM probe counts)
+- GUI: `AuthSessionStep`, SSO auth mode, LLM planner toggle in `WebScanWizard`
+
 ## [1.2.0] - 2026-06-20
 
 ### Added — Phase 1 (Universal endpoint scanning)

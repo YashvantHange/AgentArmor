@@ -30,6 +30,7 @@ from agentarmor.modules.agent.runner import list_agent_probes, run_agent_probe
 from agentarmor.modules.mcp.runner import list_mcp_probes, run_mcp_probe
 from agentarmor.modules.rag.runner import list_rag_probes, run_rag_probe
 from agentarmor.modules.router import is_module_target
+from agentarmor.orchestrator.plugins.registry import filter_probes_by_plugins
 from agentarmor.orchestrator.probes.l1_single import ProbeDefinition, get_l1_probes
 from agentarmor.orchestrator.probes.l2_mutation import get_l2_probes
 from agentarmor.orchestrator.probes.l3_multiturn import MultiTurnProbe, get_l3_probes
@@ -156,6 +157,11 @@ class ScanRunner:
 
     async def run(self, scan: Scan) -> Scan:
         validate_target(self._config)
+
+        if scan.metadata.get("scan_mode") == "multi_agent_redteam":
+            from agentarmor.redteam.orchestrator import RedTeamOrchestrator
+
+            return await RedTeamOrchestrator(self._config, self._repo).run(scan)
 
         probe_list = await _collect_probes(self._config)
 

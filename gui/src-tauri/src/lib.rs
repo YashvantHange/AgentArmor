@@ -45,9 +45,9 @@ fn spawn_sidecar(handle: &tauri::AppHandle) {
 
 fn build_sidecar_command(handle: &tauri::AppHandle, port: &str) -> Command {
     let host = "127.0.0.1";
-    if let Some(python) = resolve_embedded_python(handle) {
-        let mut cmd = Command::new(python);
-        cmd.args([
+    let mut cmd = if let Some(python) = resolve_embedded_python(handle) {
+        let mut c = Command::new(python);
+        c.args([
             "-m",
             "agentarmor.cli.main",
             "serve",
@@ -56,21 +56,32 @@ fn build_sidecar_command(handle: &tauri::AppHandle, port: &str) -> Command {
             "--host",
             host,
         ]);
-        return cmd;
-    }
-
-    let python = std::env::var("AGENTARMOR_PYTHON").unwrap_or_else(|_| "python".into());
-    let mut cmd = Command::new(&python);
-    cmd.args([
-        "-m",
-        "agentarmor.cli.main",
-        "serve",
-        "--port",
-        port,
-        "--host",
-        host,
-    ]);
+        c
+    } else {
+        let python = std::env::var("AGENTARMOR_PYTHON").unwrap_or_else(|_| "python".into());
+        let mut c = Command::new(&python);
+        c.args([
+            "-m",
+            "agentarmor.cli.main",
+            "serve",
+            "--port",
+            port,
+            "--host",
+            host,
+        ]);
+        c
+    };
+    apply_playwright_env(&mut cmd, handle);
     cmd
+}
+
+fn apply_playwright_env(cmd: &mut Command, handle: &tauri::AppHandle) {
+    if let Ok(res) = handle.path().resource_dir() {
+        let bundled = res.join("playwright");
+        if bundled.exists() {
+            cmd.env("PLAYWRIGHT_BROWSERS_PATH", &bundled);
+        }
+    }
 }
 
 #[cfg(windows)]

@@ -38,6 +38,35 @@ _HTML_TEMPLATE = """<!DOCTYPE html>
   <p class="meta">Scan ID: {{ scan.id }} · Target: {{ target_label }} · Status: {{ scan.status.value }}</p>
 
   <h2>Executive Summary</h2>
+  {% if capability_map %}
+  <div class="card" style="margin-bottom:1.5rem;">
+    <h3>Agent Capability Map</h3>
+    <p><strong>Framework:</strong> {{ capability_map.framework or 'Unknown' }}</p>
+    <p>
+      {% if capability_map.rag %}<span class="owasp-tag">RAG</span>{% endif %}
+      {% if capability_map.memory %}<span class="owasp-tag">Memory</span>{% endif %}
+      {% if capability_map.mcp %}<span class="owasp-tag">MCP</span>{% endif %}
+      {% if capability_map.a2a %}<span class="owasp-tag">A2A</span>{% endif %}
+    </p>
+    <p><strong>Agent Risk Score:</strong> {{ capability_map.risk_score }}/10</p>
+    {% if capability_map.tools %}
+    <p><strong>Tools:</strong> {{ capability_map.tools|join(', ') }}</p>
+    {% endif %}
+    {% if capability_map.risk_reasons %}
+    <ul>{% for r in capability_map.risk_reasons %}<li>{{ r }}</li>{% endfor %}</ul>
+    {% endif %}
+  </div>
+  {% endif %}
+  {% if attack_plan %}
+  <div class="card" style="margin-bottom:1.5rem;">
+    <h3>Attack Plan</h3>
+    <p><strong>Rule-based probes:</strong> {{ attack_plan.rule_probe_count | default(0) }}</p>
+    {% if attack_plan.llm_probe_count %}
+    <p><strong>LLM-generated probes:</strong> {{ attack_plan.llm_probe_count }}</p>
+    <p class="meta">IDs: {{ attack_plan.llm_probe_ids | join(', ') }}</p>
+    {% endif %}
+  </div>
+  {% endif %}
   <p>
     AgentArmor executed <strong>{{ scan.probe_count }}</strong> security probes against
     <strong>{{ target_label }}</strong> and identified
@@ -163,6 +192,9 @@ def write_html_report(
 
     owasp_names = {tag: rule_name(tag) for tag in owasp_counter}
 
+    capability_map = scan.metadata.get("capability_map") if scan.metadata else None
+    attack_plan = scan.metadata.get("attack_plan") if scan.metadata else None
+
     html = Template(_HTML_TEMPLATE).render(
         scan=scan,
         findings=findings,
@@ -171,6 +203,8 @@ def write_html_report(
         severity_counts=sorted(sev_counter.items(), key=lambda x: x[0]),
         owasp_counts=sorted(owasp_counter.items()),
         owasp_names=owasp_names,
+        capability_map=capability_map,
+        attack_plan=attack_plan,
         version=version,
     )
     output_path.parent.mkdir(parents=True, exist_ok=True)

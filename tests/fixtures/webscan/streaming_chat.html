@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><title>Streaming Chat</title></head>
+<body>
+  <div class="chat-container">
+    <div id="responses" class="assistant-message"></div>
+    <div id="typing" class="typing" style="display:none">Thinking...</div>
+    <textarea id="prompt" placeholder="Ask the assistant" role="textbox"></textarea>
+    <button id="go">Send</button>
+  </div>
+  <script>
+    document.getElementById('go').onclick = () => {
+      const typing = document.getElementById('typing');
+      const out = document.getElementById('responses');
+      typing.style.display = 'block';
+      out.textContent = '';
+      const tokens = ['I ', 'cannot ', 'reveal ', 'hidden ', 'instructions.'];
+      let i = 0;
+      const iv = setInterval(() => {
+        if (i < tokens.length) {
+          out.textContent += tokens[i++];
+        } else {
+          clearInterval(iv);
+          typing.style.display = 'none';
+        }
+      }, 80);
+    };
+  </script>
+</body>
+</html>

@@ -157,6 +157,39 @@ def db_migrate(
 models_app = typer.Typer(help="Detection model management")
 app.add_typer(models_app, name="models")
 
+browser_app = typer.Typer(help="Playwright browser for web scans")
+app.add_typer(browser_app, name="browser")
+
+
+@browser_app.command("install")
+def browser_install() -> None:
+    """Install Chromium for chatbot URL scanning."""
+    try:
+        from playwright.__main__ import main as playwright_main
+    except ImportError:
+        typer.echo(
+            "Playwright is not installed. Run: pip install 'agentarmor[browser]'",
+            err=True,
+        )
+        raise typer.Exit(1)
+    import sys
+
+    sys.argv = ["playwright", "install", "chromium"]
+    playwright_main()
+    typer.echo("Chromium installed for web scans.")
+
+
+@browser_app.command("status")
+def browser_status() -> None:
+    """Check Playwright availability for web scans."""
+    from agentarmor.webscan.browser.pool import playwright_available
+
+    if playwright_available():
+        typer.echo("Playwright: installed")
+    else:
+        typer.echo("Playwright: not installed (pip install 'agentarmor[browser]')")
+        raise typer.Exit(1)
+
 
 @models_app.command("download")
 def models_download(

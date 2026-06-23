@@ -11,6 +11,7 @@ export interface RedTeamOptions {
   self_play_stop_on_success: boolean;
   self_play_discovery_enabled: boolean;
   self_play_defender_enabled: boolean;
+  multi_agent_redteam: boolean;
 }
 
 export const DEFAULT_REDTEAM: RedTeamOptions = {
@@ -23,6 +24,7 @@ export const DEFAULT_REDTEAM: RedTeamOptions = {
   self_play_stop_on_success: true,
   self_play_discovery_enabled: true,
   self_play_defender_enabled: false,
+  multi_agent_redteam: false,
 };
 
 const SUITE_OPTIONS = [
@@ -74,6 +76,15 @@ export function RedTeamOptionsPicker({
         checked={value.l0_enabled}
         onChange={(l0_enabled) => onChange({ ...value, l0_enabled })}
       />
+
+      {analysisMode === "cloud" && (
+        <ToggleRow
+          label="Multi-agent red team"
+          description="Capability-aware attack graph with budget governance (replaces linear probe loop)"
+          checked={value.multi_agent_redteam}
+          onChange={(multi_agent_redteam) => onChange({ ...value, multi_agent_redteam })}
+        />
+      )}
 
       {value.l0_enabled && (
         <div className="space-y-4 rounded-lg border border-surface-border bg-surface-overlay p-4">
@@ -249,6 +260,7 @@ export function redTeamToScanBody(options: RedTeamOptions): Record<string, unkno
     self_play_stop_on_success: options.self_play_stop_on_success,
     self_play_discovery_enabled: options.self_play_discovery_enabled,
     self_play_defender_enabled: options.self_play_defender_enabled,
+    scan_mode: options.multi_agent_redteam ? "multi_agent_redteam" : "standard",
   };
 }
 

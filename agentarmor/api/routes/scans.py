@@ -8,7 +8,7 @@ from pathlib import Path
 from fastapi import APIRouter, BackgroundTasks, HTTPException
 from pydantic import BaseModel, Field
 
-from agentarmor.core.config import apply_analysis_options, apply_endpoint_options, apply_redteam_options, load_config, merge_cli_target
+from agentarmor.core.config import apply_analysis_options, apply_endpoint_options, apply_multi_agent_redteam_options, apply_redteam_options, load_config, merge_cli_target
 from agentarmor.core.models import Scan
 from agentarmor.db.session import ScanRepository
 from agentarmor.engines.router import validate_target
@@ -49,6 +49,10 @@ class ScanCreateRequest(BaseModel):
     self_play_stop_on_success: bool | None = None
     self_play_discovery_enabled: bool | None = None
     self_play_defender_enabled: bool | None = None
+    scan_mode: str = "standard"
+    redteam_max_rounds: int | None = None
+    redteam_max_tokens: int | None = None
+    redteam_max_cost_usd: float | None = None
     formats: list[str] = Field(default_factory=lambda: ["json", "html", "sarif"])
     config_path: str | None = None
 
@@ -101,6 +105,19 @@ def _build_config(body: ScanCreateRequest):
         self_play_discovery_enabled=body.self_play_discovery_enabled,
         self_play_defender_enabled=body.self_play_defender_enabled,
     )
+    cfg = apply_multi_agent_redteam_options(
+        cfg,
+        scan_mode=body.scan_mode,
+        max_rounds=body.redteam_max_rounds,
+        max_tokens=body.redteam_max_tokens,
+        max_cost_usd=body.redteam_max_cost_usd,
+    )
+    if body.scan_mode == "multi_agent_redteam":
+        if cfg.detection.analysis_mode != "cloud" or not cfg.detection.agentic.api_key:
+            raise HTTPException(
+                400,
+                "multi_agent_redteam requires analysis_mode=cloud with a provider API key.",
+            )
     validate_target(cfg)
     return cfg
 
@@ -113,6 +130,8 @@ async def create_scan(body: ScanCreateRequest, background_tasks: BackgroundTasks
     except ValueError as exc:
         raise HTTPException(400, str(exc)) from exc
     scan = Scan(target=cfg.target)
+    if body.scan_mode == "multi_agent_redteam":
+        scan.metadata["scan_mode"] = "multi_agent_redteam"
     _repo.save_scan(scan)
     background_tasks.add_task(_run_scan_background, cfg, scan.id, body.formats)
     return {

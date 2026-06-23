@@ -20,13 +20,15 @@ from agentarmor.api.routes.monitoring import router as monitoring_router
 from agentarmor.api.routes.scans import router as scans_router
 from agentarmor.api.routes.settings import router as settings_router
 from agentarmor.api.routes.targets import router as targets_router
+from agentarmor.api.routes.web_scans import router as web_scans_router
 from agentarmor.core.config import load_config
 from agentarmor.core.events import event_bus
 from agentarmor.db.benchmark_session import BenchmarkRepository
 from agentarmor.db.monitor_session import MonitorRepository
 from agentarmor.db.session import ScanRepository
-from agentarmor.monitoring.scheduler import MonitoringScheduler
 from agentarmor.detection.api.routes import router as detection_router
+from agentarmor.monitoring.scheduler import MonitoringScheduler
+from agentarmor.webscan.browser.pool import playwright_available
 
 _config_path = Path(os.environ.get("AGENTARMOR_CONFIG", "AgentArmor.toml"))
 _app_config = load_config(_config_path if _config_path.exists() else None)
@@ -74,11 +76,17 @@ app.include_router(datasets_router)
 app.include_router(scans_router)
 app.include_router(settings_router)
 app.include_router(targets_router)
+app.include_router(web_scans_router)
 
 
 @app.get("/health")
-def health() -> dict[str, str]:
-    return {"status": "ok", "version": __version__}
+def health() -> dict[str, str | bool]:
+    ready = playwright_available()
+    return {
+        "status": "ok",
+        "version": __version__,
+        "webscan_ready": ready,
+    }
 
 
 @app.get("/v1/findings")

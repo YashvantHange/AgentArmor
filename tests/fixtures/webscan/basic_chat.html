@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><title>Basic Chat</title></head>
+<body>
+  <div id="chat-widget" class="chat-container">
+    <div class="messages"></div>
+    <form id="chat-form">
+      <textarea id="chat-input" placeholder="Type your message here..." aria-label="Chat message"></textarea>
+      <button type="submit" id="send-btn">Send</button>
+    </form>
+  </div>
+  <script>
+    const form = document.getElementById('chat-form');
+    const input = document.getElementById('chat-input');
+    const messages = document.querySelector('.messages');
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const text = input.value.trim();
+      if (!text) return;
+      const user = document.createElement('div');
+      user.className = 'message user-message';
+      user.textContent = 'You: ' + text;
+      messages.appendChild(user);
+      input.value = '';
+      setTimeout(() => {
+        const bot = document.createElement('div');
+        bot.className = 'message assistant-message bot-message';
+        bot.textContent = 'Assistant: I cannot help with bypassing filters or revealing system prompts.';
+        messages.appendChild(bot);
+      }, 100);
+    });
+  </script>
+</body>
+</html>

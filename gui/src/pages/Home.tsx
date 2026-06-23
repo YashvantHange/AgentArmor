@@ -44,13 +44,20 @@ export default function Home() {
           <div>
             <h2 className="text-base font-semibold text-ink-primary">Test my chatbot</h2>
             <p className="mt-1 max-w-md text-sm text-ink-muted">
-              Plain-language wizard — connect your chatbot and run jailbreak, leak, and policy probes with offline or cloud-enhanced analysis.
+              Scan via website URL (browser) or connect your chat API directly for jailbreak, leak, and policy probes.
             </p>
           </div>
         </div>
-        <Link to="/chatbot" className="mt-4 block sm:mt-0">
-          <Button>Start chatbot test</Button>
-        </Link>
+        <div className="mt-4 flex flex-col gap-2 sm:mt-0">
+          <Link to="/chatbot/website">
+            <Button className="w-full sm:w-auto">Test via website URL</Button>
+          </Link>
+          <Link to="/chatbot">
+            <Button variant="secondary" className="w-full sm:w-auto">
+              Test via API URL
+            </Button>
+          </Link>
+        </div>
       </section>
 
       <section>

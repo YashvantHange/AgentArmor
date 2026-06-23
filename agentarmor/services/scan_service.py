@@ -23,7 +23,11 @@ async def execute_scan(
 
     scan = Scan(target=config.target)
     if scan_id:
-        scan.id = scan_id
+        existing = repo.get_scan(scan_id)
+        if existing:
+            scan = existing
+        else:
+            scan.id = scan_id
     runner = ScanRunner(config, repo)
     completed = await runner.run(scan)
     findings = repo.list_findings(scan_id=completed.id)

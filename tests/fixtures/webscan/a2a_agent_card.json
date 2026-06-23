@@ -1,0 +1,6 @@
+{
+  "name": "Fixture Agent",
+  "description": "Test agent card",
+  "url": "https://example.com/agent",
+  "capabilities": ["chat", "tools"]
+}

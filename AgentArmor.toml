@@ -27,3 +27,36 @@ fail_on = ["HIGH", "CRITICAL"]
 [reporting]
 formats = ["json", "sarif"]
 output_dir = "./reports"
+
+[webscan]
+max_scans_per_day = 10
+session_ttl_hours = 24
+max_probes_per_scan = 30
+multi_agentic_max_probes = 45
+llm_discovery_min_confidence = 0.4
+max_concurrent_browsers = 2
+timeout_s = 30
+stable_ms = 1500
+max_wait_ms = 45000
+allowlist = []
+blocklist = []
+
+[webscan.risk_weights]
+per_tool = 0.5
+per_tool_cap = 3.0
+external_actions = 2.0
+rag = 1.5
+memory = 1.5
+mcp = 2.0
+mcp_tools_combo = 1.0
+high_agentic = 1.0
+high_agentic_threshold = 0.8
+
+[redteam.budget]
+max_tokens = 50000
+max_cost_usd = 2.0
+warn_at_pct = 80
+
+[redteam.multi_agent]
+max_rounds = 12
+stop_on_vulnerability = true

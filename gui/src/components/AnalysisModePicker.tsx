@@ -33,9 +33,9 @@ export function AnalysisModePicker({ value, onChange, compact }: Props) {
           onClick={() => onChange({ ...value, analysis_mode: "offline" })}
         />
         <ModeCard
-          title="Cloud enhanced"
-          subtitle="Multi-agent AI analysis (recommended for accuracy)"
-          description="Uses your provider API for deeper OWASP mapping and remediation."
+          title="Multi-agent analysis"
+          subtitle="Cloud · attack-graph red team"
+          description="Uses your provider API for capability-aware planning, judge, and confidence scoring."
           active={value.analysis_mode === "cloud"}
           onClick={() => onChange({ ...value, analysis_mode: "cloud" })}
         />

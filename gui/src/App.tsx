@@ -13,6 +13,7 @@ import ScanConfig from "./pages/ScanConfig";
 import ScanProgress from "./pages/ScanProgress";
 import SettingsPage from "./pages/Settings";
 import ChatbotWizard from "./pages/chatbot/ChatbotWizard";
+import WebScanWizard from "./pages/chatbot/WebScanWizard";
 import { ShieldIcon } from "./components/icons";
 
 export default function App() {
@@ -70,6 +71,7 @@ export default function App() {
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/chatbot" element={<ChatbotWizard />} />
+        <Route path="/chatbot/website" element={<WebScanWizard />} />
         <Route path="/scan/:type" element={<ScanConfig />} />
         <Route path="/progress/:scanId" element={<ScanProgress />} />
         <Route path="/findings/:scanId" element={<Findings />} />

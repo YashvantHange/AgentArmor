@@ -128,6 +128,7 @@ class Finding(BaseModel):
 
 class ScanStatus(str, Enum):
     PENDING = "pending"
+    AWAITING_AUTH = "awaiting_auth"
     RUNNING = "running"
     COMPLETED = "completed"
     FAILED = "failed"

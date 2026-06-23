@@ -166,6 +166,50 @@ class ReportingConfig(BaseModel):
     output_dir: str = "./reports"
 
 
+class WebScanRiskWeights(BaseModel):
+    per_tool: float = 0.5
+    per_tool_cap: float = 3.0
+    external_actions: float = 2.0
+    rag: float = 1.5
+    memory: float = 1.5
+    mcp: float = 2.0
+    mcp_tools_combo: float = 1.0
+    high_agentic: float = 1.0
+    high_agentic_threshold: float = 0.8
+
+
+class WebScanConfig(BaseModel):
+    max_scans_per_day: int = 10
+    max_probes_per_scan: int = 30
+    multi_agentic_max_probes: int = 45
+    llm_discovery_min_confidence: float = 0.4
+    max_concurrent_browsers: int = 2
+    session_ttl_hours: int = 24
+    timeout_s: float = 30.0
+    stable_ms: int = 1500
+    max_wait_ms: int = 45000
+    allowlist: list[str] = Field(default_factory=list)
+    blocklist: list[str] = Field(default_factory=list)
+    risk_weights: WebScanRiskWeights = Field(default_factory=WebScanRiskWeights)
+
+
+class RedTeamBudgetConfig(BaseModel):
+    max_tokens: int = 50_000
+    max_cost_usd: float = 2.0
+    warn_at_pct: float = 80.0
+
+
+class RedTeamMultiAgentConfig(BaseModel):
+    enabled: bool = True
+    max_rounds: int = 12
+    stop_on_vulnerability: bool = True
+
+
+class RedTeamConfig(BaseModel):
+    multi_agent: RedTeamMultiAgentConfig = Field(default_factory=RedTeamMultiAgentConfig)
+    budget: RedTeamBudgetConfig = Field(default_factory=RedTeamBudgetConfig)
+
+
 class AppConfig(BaseModel):
     target: Target = Field(default_factory=Target)
     engine_endpoint: EndpointEngineConfig = Field(default_factory=EndpointEngineConfig)
@@ -176,6 +220,8 @@ class AppConfig(BaseModel):
     module_rag: RagModuleConfig = Field(default_factory=RagModuleConfig)
     detection: DetectionConfig = Field(default_factory=DetectionConfig)
     reporting: ReportingConfig = Field(default_factory=ReportingConfig)
+    webscan: WebScanConfig = Field(default_factory=WebScanConfig)
+    redteam: RedTeamConfig = Field(default_factory=RedTeamConfig)
     database_url: str = "sqlite:///./agentarmor.db"
     plugin_dirs: list[str] = Field(
         default_factory=lambda: ["probes", "detectors", "reporters", "engines", "plugins"]
@@ -228,7 +274,32 @@ def load_config(path: Path | None = None) -> AppConfig:
         module_rag=RagModuleConfig(**module_section.get("rag", {})),
         detection=_load_detection_config(raw.get("detection", {})),
         reporting=ReportingConfig(**raw.get("reporting", {})),
+        webscan=_load_webscan_config(raw.get("webscan", {})),
+        redteam=_load_redteam_config(raw.get("redteam", {})),
     )
+
+
+def _load_webscan_config(raw: object) -> WebScanConfig:
+    if not isinstance(raw, dict) or not raw:
+        return WebScanConfig()
+    data = dict(raw)
+    rw = data.pop("risk_weights", None)
+    if isinstance(rw, dict):
+        data["risk_weights"] = WebScanRiskWeights(**rw)
+    return WebScanConfig(**data)
+
+
+def _load_redteam_config(raw: object) -> RedTeamConfig:
+    if not isinstance(raw, dict) or not raw:
+        return RedTeamConfig()
+    data = dict(raw)
+    budget_raw = data.pop("budget", None)
+    multi_raw = data.pop("multi_agent", None)
+    if isinstance(budget_raw, dict):
+        data["budget"] = RedTeamBudgetConfig(**budget_raw)
+    if isinstance(multi_raw, dict):
+        data["multi_agent"] = RedTeamMultiAgentConfig(**multi_raw)
+    return RedTeamConfig(**data)
 
 
 def _load_detection_config(raw: object) -> DetectionConfig:
@@ -334,6 +405,30 @@ def apply_redteam_options(
         config.detection.self_play.discovery_enabled = self_play_discovery_enabled
     if self_play_defender_enabled is not None:
         config.detection.self_play.defender_enabled = self_play_defender_enabled
+    return config
+
+
+def apply_multi_agent_redteam_options(
+    config: AppConfig,
+    *,
+    scan_mode: str | None = None,
+    max_rounds: int | None = None,
+    max_tokens: int | None = None,
+    max_cost_usd: float | None = None,
+) -> AppConfig:
+    if max_rounds is not None:
+        config.redteam.multi_agent.max_rounds = max(1, max_rounds)
+    if max_tokens is not None:
+        config.redteam.budget.max_tokens = max(1000, max_tokens)
+    if max_cost_usd is not None:
+        config.redteam.budget.max_cost_usd = max(0.01, max_cost_usd)
+    if scan_mode == "multi_agent_redteam":
+        config.detection.analysis_mode = "cloud"
+        config.detection.agentic.enabled = True
+        if not config.detection.agentic.api_key:
+            env_key = os.environ.get(config.detection.agentic.api_key_env, "")
+            if env_key:
+                config.detection.agentic.api_key = env_key
     return config
 
 

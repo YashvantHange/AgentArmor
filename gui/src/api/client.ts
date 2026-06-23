@@ -33,6 +33,7 @@ export interface ScanCreateBody {
   self_play_stop_on_success?: boolean;
   self_play_discovery_enabled?: boolean;
   self_play_defender_enabled?: boolean;
+  scan_mode?: "standard" | "multi_agent_redteam";
 }
 
 export interface EvidenceGraph {
@@ -51,6 +52,8 @@ export interface ScanSummary {
     attack_trees?: AttackTree[];
     evidence_graph?: EvidenceGraph;
     self_play?: { successful?: boolean; rounds?: number };
+    redteam_trace?: Record<string, unknown>;
+    redteam_summary?: Record<string, unknown>;
   };
 }
 
@@ -134,8 +137,74 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return res.json() as Promise<T>;
 }
 
+export function eventsUrl(scanId: string): string {
+  return `${base}/v1/scans/${scanId}/events`;
+}
+
+export interface WebDiscoverBody {
+  page_url: string;
+}
+
+export interface WebDiscoverResult {
+  ok: boolean;
+  error?: string;
+  framework?: string | null;
+  widget?: {
+    confidence: number;
+    input_selector: string;
+    send_selector?: string | null;
+    framework?: string | null;
+  } | null;
+  candidates?: unknown[];
+  capability_map?: {
+    framework?: string | null;
+    rag: boolean;
+    memory: boolean;
+    mcp: boolean;
+    a2a: boolean;
+    tools: string[];
+    agentic_score: number;
+    risk_score: number;
+    risk_reasons: string[];
+  } | null;
+  agent_risk?: {
+    tool_count: number;
+    rag_enabled: boolean;
+    memory_enabled: boolean;
+    mcp_enabled: boolean;
+    external_actions: boolean;
+    agentic_score: number;
+    risk_score: number;
+    risk_reasons: string[];
+  } | null;
+}
+
+export interface WebScanCreateBody {
+  page_url: string;
+  scan_depth?: "standard" | "multi_agentic";
+  auth_mode?: "none" | "manual_session";
+  planner_enabled?: boolean;
+  owasp_filters?: string[];
+  analysis_mode?: AnalysisMode;
+  analysis_provider?: string;
+  analysis_model?: string;
+  analysis_api_key?: string;
+  formats?: string[];
+}
+
+export interface WebScanContinueBody {
+  scan_depth?: "standard" | "multi_agentic";
+  planner_enabled?: boolean;
+  owasp_filters?: string[];
+  analysis_mode?: AnalysisMode;
+  analysis_provider?: string;
+  analysis_model?: string;
+  analysis_api_key?: string;
+  formats?: string[];
+}
+
 export const api = {
-  health: () => request<{ status: string; version: string }>("/health"),
+  health: () => request<{ status: string; version: string; webscan_ready?: boolean }>("/health"),
 
   createScan: (body: ScanCreateBody) =>
     request<{ scan_id: string; status: string }>("/v1/scans", {
@@ -245,8 +314,40 @@ export const api = {
         anonymize: body.anonymize ?? true,
       }),
     }),
+
+  getWebScanCapabilities: () =>
+    request<{
+      webscan_ready: boolean;
+      hint?: string;
+      scan_depths: string[];
+      auth_modes?: string[];
+      planner_requires_multi_agentic?: boolean;
+    }>("/v1/web-scans/capabilities"),
+
+  discoverWebScan: (body: WebDiscoverBody) =>
+    request<WebDiscoverResult>("/v1/web-scans/discover", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+
+  createWebScan: (body: WebScanCreateBody) =>
+    request<{ scan_id: string; status: string; scan_kind: string }>("/v1/web-scans", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+
+  prepareWebScanSession: (body: WebDiscoverBody) =>
+    request<{ scan_id: string; status: string; message?: string }>("/v1/web-scans/prepare-session", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+
+  continueWebScanSession: (scanId: string, body: WebScanContinueBody) =>
+    request<{ scan_id: string; status: string; scan_kind: string }>(
+      `/v1/web-scans/${scanId}/continue`,
+      { method: "POST", body: JSON.stringify(body) }
+    ),
+
+  getWebScan: (id: string) => request<ScanSummary & { scan_kind?: string }>(`/v1/web-scans/${id}`),
 };
 
-export function eventsUrl(scanId: string): string {
-  return `${base}/v1/scans/${scanId}/events`;
-}

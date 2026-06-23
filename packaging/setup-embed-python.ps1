@@ -49,7 +49,8 @@ try {
 
     if ($WheelPath -and (Test-Path $WheelPath)) {
         Write-Host "Installing prebuilt wheel: $WheelPath"
-        & "$EmbedRoot\python.exe" -m pip install $WheelPath --no-warn-script-location
+        & "$EmbedRoot\python.exe" -m pip install $WheelPath --force-reinstall --no-warn-script-location
+        & "$EmbedRoot\python.exe" -m pip install "playwright>=1.40.0" --no-warn-script-location
     } else {
         $dist = Join-Path $RepoRoot "dist"
         $wheel = Get-ChildItem -Path $dist -Filter "agentarmor-*.whl" -ErrorAction SilentlyContinue |
@@ -67,14 +68,27 @@ try {
         }
         if (-not $wheel) { throw "No agentarmor wheel found in dist/" }
         Write-Host "Installing wheel into embed Python: $($wheel.FullName)"
-        $wheelWithExtras = "$($wheel.FullName)[ml]"
-        & "$EmbedRoot\python.exe" -m pip install $wheelWithExtras --no-warn-script-location
+        $wheelWithExtras = "$($wheel.FullName)[ml,browser]"
+        & "$EmbedRoot\python.exe" -m pip install $wheelWithExtras --force-reinstall --no-warn-script-location
     }
     if ($LASTEXITCODE -ne 0) { throw "pip install agentarmor failed with exit code $LASTEXITCODE" }
+    & "$EmbedRoot\python.exe" -m pip install "playwright>=1.40.0" --no-warn-script-location
+    if ($LASTEXITCODE -ne 0) { throw "pip install playwright failed with exit code $LASTEXITCODE" }
     $agentarmor = Join-Path $EmbedRoot "Scripts\agentarmor.exe"
     if (-not (Test-Path $agentarmor)) {
         throw "agentarmor.exe not found at $agentarmor after pip install"
     }
+
+    # Bundle Chromium for web scans (~150-200 MB)
+    $PlaywrightDest = Join-Path $RepoRoot "gui\src-tauri\resources\playwright"
+    if (Test-Path $PlaywrightDest) { Remove-Item $PlaywrightDest -Recurse -Force }
+    New-Item -ItemType Directory -Force -Path $PlaywrightDest | Out-Null
+    $env:PLAYWRIGHT_BROWSERS_PATH = $PlaywrightDest
+    Write-Host "Installing Playwright Chromium into $PlaywrightDest ..."
+    & "$EmbedRoot\python.exe" -m playwright install chromium
+    if ($LASTEXITCODE -ne 0) { throw "playwright install chromium failed with exit code $LASTEXITCODE" }
+    Write-Host "Playwright browsers staged at $PlaywrightDest"
+
     if (-not $SkipModelsDownload) {
         & $agentarmor models download
         if ($LASTEXITCODE -ne 0) { throw "agentarmor models download failed with exit code $LASTEXITCODE" }

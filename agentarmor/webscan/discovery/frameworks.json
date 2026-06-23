@@ -1,0 +1,84 @@
+{
+  "providers": [
+    {
+      "id": "intercom",
+      "name": "Intercom",
+      "script_patterns": ["intercom", "widget.intercom.io"],
+      "dom_selectors": ["#intercom-container", ".intercom-messenger-frame", "[class*='intercom']"],
+      "globals": ["Intercom"]
+    },
+    {
+      "id": "drift",
+      "name": "Drift",
+      "script_patterns": ["drift.com", "js.driftt.com"],
+      "dom_selectors": ["#drift-widget", "[class*='drift-']"],
+      "globals": ["drift"]
+    },
+    {
+      "id": "zendesk",
+      "name": "Zendesk",
+      "script_patterns": ["zendesk", "zdassets"],
+      "dom_selectors": ["#launcher", "[class*='zEWidget']"],
+      "globals": ["zE"]
+    },
+    {
+      "id": "freshchat",
+      "name": "Freshchat",
+      "script_patterns": ["freshchat", "wchat.freshchat.com"],
+      "dom_selectors": ["#fc_frame", ".fc-widget-normal"],
+      "globals": ["fcWidget"]
+    },
+    {
+      "id": "crisp",
+      "name": "Crisp",
+      "script_patterns": ["crisp.chat", "client.crisp.chat"],
+      "dom_selectors": [".crisp-client", "#crisp-chatbox"],
+      "globals": ["$crisp"]
+    },
+    {
+      "id": "tidio",
+      "name": "Tidio",
+      "script_patterns": ["tidio.co", "code.tidio.co"],
+      "dom_selectors": ["#tidio-chat", "[id*='tidio']"],
+      "globals": ["tidioChatApi"]
+    },
+    {
+      "id": "hubspot",
+      "name": "HubSpot",
+      "script_patterns": ["hubspot", "hs-scripts.com", "hsforms.net"],
+      "dom_selectors": ["#hubspot-messages-iframe-container"],
+      "globals": ["HubSpotConversations"]
+    },
+    {
+      "id": "botpress",
+      "name": "Botpress",
+      "script_patterns": ["botpress", "cdn.botpress.cloud"],
+      "dom_selectors": ["[class*='bpWidget']", ".bpw-layout"],
+      "globals": ["botpressWebChat"]
+    },
+    {
+      "id": "voiceflow",
+      "name": "Voiceflow",
+      "script_patterns": ["voiceflow", "cdn.voiceflow.com"],
+      "dom_selectors": ["[class*='vfrc']"],
+      "globals": ["voiceflow"]
+    },
+    {
+      "id": "chatbase",
+      "name": "Chatbase",
+      "script_patterns": ["chatbase.co", "www.chatbase.co"],
+      "dom_selectors": ["[id*='chatbase']"],
+      "globals": ["chatbase"]
+    },
+    {
+      "id": "openai",
+      "name": "OpenAI Web SDK",
+      "script_patterns": ["cdn.openai.com", "chatgpt.com"],
+      "dom_selectors": ["[data-testid*='conversation']", "textarea"],
+      "globals": ["openai"]
+    }
+  ],
+  "chat_keywords": [
+    "chat", "message", "ask", "assistant", "send", "prompt", "support", "help"
+  ]
+}

@@ -14,6 +14,27 @@ jobs:
           python-version: "3.12"
       - run: pip install -e ".[dev]"
       - run: pytest
+  webscan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -e ".[dev,browser]"
+      - run: playwright install chromium
+      - run: pytest tests/test_webscan_*.py -v
+  redteam:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -e ".[dev]"
+      - run: pip wheel . -w /tmp/wheel --no-deps && pip install /tmp/wheel/agentarmor-*.whl
+      - run: pytest tests/test_redteam_*.py -v
+      - run: python scripts/validate_redteam_agents.py
   rust-l1:
     runs-on: ubuntu-latest
     steps:

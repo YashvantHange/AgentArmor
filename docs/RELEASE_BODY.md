@@ -1,34 +1,25 @@
-## AgentArmor v1.2.0 — Full Platform Release
+## AgentArmor v1.2.1 — Multi-agent red team & web scan
 
-All four development phases ship together in this release.
+This release ships the multi-agent OWASP red team roster and enterprise chatbot URL scanner improvements from the latest `main` branch.
 
-### Phase 1 — Universal endpoint scanning
-- OpenAI / custom / auto-detected API profiles
-- Connectivity guards (no silent PASS on HTML errors)
-- Promptfoo-inspired plugins, strategies, and assertions
-- Multi-agent cloud enrichment (judge, triage, OWASP mapping)
-- Chatbot security wizard in the desktop GUI
+### Multi-agent OWASP red team
+- `agentarmor/redteam/` orchestrator with attack-graph planner, budget governor, and verdict scoring
+- 16 skill YAML bundles and 13 dedicated agent classes (LLM01–LLM10, Memory, A2A, MCP)
+- `scan_mode=multi_agent_redteam` on `/v1/scans` (requires cloud analysis API key)
+- Web scans: `multi_agentic` + `planner_enabled` runs red team against discovered widgets
+- Findings include confidence, reproducibility, and impact scores
+- GUI toggle for multi-agent red team; quality gates and regression tests in CI
 
-### Phase 2 — Adaptive attack generation
-- L0 attack generator with 100+ mutation variants per goal
-- OWASP suites: prompt leak, poisoning, model theft, memory poison
-- Enterprise risk score (0–100) with exploitability and confidence
-- Attack trees and evidence graph in findings UI
+### Chatbot URL scanner
+- Enterprise `manual_session` auth with headed browser login and encrypted session storage
+- `POST /v1/web-scans/prepare-session` and continue flow for SSO-style targets
+- LLM attack planner for multi-agentic web scans
+- Multi-turn memory probe without page reload
+- Daily web scan rate limiting and HTML report attack-plan summary
 
-### Phase 3 — Self-play red teaming
-- Attacker / Defender / Judge autonomous loop
-- Multi-agent attack discovery (Garak-style)
-- Tools benchmark: compare AgentArmor vs PyRIT, Garak, Promptfoo, Inspect AI
-
-### Phase 4 — Ecosystem
-- Community rule marketplace (install probes and OWASP packs)
-- Custom Probe SDK for third-party extensions
-- Continuous monitoring with scheduled rescans and drift detection
-- Research dataset export (anonymized JSONL)
-
-### Desktop GUI
-- Redesigned security-console UI
-- Marketplace, Monitoring, Benchmark, and Chatbot wizard screens
+### Packaging
+- Embedded Python bundle includes red team skills and Playwright for packaged `.exe` builds
+- Version aligned to 1.2.1 across Python, Tauri, and npm
 
 ---
 
@@ -61,9 +52,6 @@ See [docs/MAC.md](https://github.com/YashvantHange/AgentArmor/blob/main/docs/MAC
 ```bash
 pip install agentarmor
 agentarmor scan --url http://localhost:8000/v1/chat/completions
-agentarmor marketplace list
-agentarmor monitor add "Daily API" --url https://api.example.com/v1/chat/completions
-agentarmor dataset export -o research.jsonl
 ```
 
 ## GitHub Action (CI)

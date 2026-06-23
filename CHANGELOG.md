@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.2.1] - 2026-06-23
+
 ### Added — Multi-agent OWASP red team
 - New `agentarmor/redteam/` package: attack-graph planner, budget governor, capability-aware attack agents (Memory, A2A, MCP, RAG, baseline LLM01/07)
 - `scan_mode=multi_agent_redteam` on `/v1/scans` (requires cloud analysis API key)
@@ -82,6 +84,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - GitHub Action for CI security scans
 - Docker image and PyPI package scaffolding
 
+[1.2.1]: https://github.com/YashvantHange/AgentArmor/compare/v1.2.0...v1.2.1
 [1.2.0]: https://github.com/YashvantHange/AgentArmor/compare/v1.0.1...v1.2.0
 [1.0.1]: https://github.com/YashvantHange/AgentArmor/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/YashvantHange/AgentArmor/releases/tag/v1.0.0

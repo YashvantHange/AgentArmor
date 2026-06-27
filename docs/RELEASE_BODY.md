@@ -1,27 +1,23 @@
-## AgentArmor v1.2.2 — Website URL scan reliability
+## AgentArmor v1.2.3 — Packaging and docs
 
-This patch release fixes live progress streaming and improves browser-based chatbot probing on public challenge sites.
+Patch release aligning Windows installer filenames with the app version and updating release documentation.
 
-### Fixed — Website URL scanning
-- SSE heartbeats and discovery/planning progress events (no more false "Connection to scan stream lost" during long scans)
-- Scan progress UI polls scan status when the event stream drops
-- Playwright response capture: baseline diffing and chat-container detection for Gandalf / Prompt Airlines-style UIs
-- Send-button heuristics skip upload/attach controls; browser session route guard fix
-- SPA chat-input wait; default page timeout 60s; low-confidence widget fallback
+### Fixed
+- Tauri bundle version synced to 1.2.3 (`AgentArmor_1.2.3_x64-setup.exe` / `.msi`)
+- GUI build typing fix for web-scan status polling
 
-### Added
-- GUI disclaimer on website URL testing limits vs API endpoint scanning
-- Framework selector hints for ChatGPT, Claude, Gemini
-- Gandalf-like regression test fixture
+### Includes v1.2.2
+- Website URL scan SSE reliability and Playwright response capture improvements
+- GUI disclaimer on website URL vs API endpoint testing limits
 
 ---
 
 ## Windows (recommended)
 
-Download **AgentArmor_*_x64-setup.exe** or **.msi** from the assets below.
+Download **AgentArmor_1.2.3_x64-setup.exe** or **AgentArmor_1.2.3_x64_en-US.msi** from the assets below.
 
-1. Run the installer (or portable `.exe`)
-2. Double-click **AgentArmor** — no Python install required
+1. Run the installer
+2. Open **AgentArmor** — no Python install required
 3. **Test my chatbot** → website URL or API URL → run scan → export reports
 
 For login-required targets (ChatGPT, Claude), use **Login required (SSO)** in the website wizard.

@@ -74,11 +74,29 @@
       "id": "openai",
       "name": "OpenAI Web SDK",
       "script_patterns": ["cdn.openai.com", "chatgpt.com"],
-      "dom_selectors": ["[data-testid*='conversation']", "textarea"],
+      "dom_selectors": ["[data-testid*='conversation']", "textarea", "#prompt-textarea"],
+      "input_hints": ["#prompt-textarea", "textarea[data-id='root']"],
       "globals": ["openai"]
+    },
+    {
+      "id": "anthropic",
+      "name": "Claude",
+      "script_patterns": ["claude.ai", "anthropic.com"],
+      "dom_selectors": ["[data-testid='chat-input']", ".ProseMirror"],
+      "input_hints": ["[data-testid='chat-input']", "div[contenteditable='true']"],
+      "globals": []
+    },
+    {
+      "id": "google_gemini",
+      "name": "Google Gemini",
+      "script_patterns": ["gemini.google.com", "bard.google.com"],
+      "dom_selectors": ["rich-textarea", ".ql-editor", "[contenteditable='true']"],
+      "input_hints": ["rich-textarea", ".ql-editor"],
+      "globals": []
     }
   ],
   "chat_keywords": [
-    "chat", "message", "ask", "assistant", "send", "prompt", "support", "help"
+    "chat", "message", "ask", "assistant", "send", "prompt", "support", "help",
+    "gandalf", "lakera", "level", "password"
   ]
 }

@@ -45,6 +45,7 @@ export default function Home() {
             <h2 className="text-base font-semibold text-ink-primary">Test my chatbot</h2>
             <p className="mt-1 max-w-md text-sm text-ink-muted">
               Scan via website URL (browser) or connect your chat API directly for jailbreak, leak, and policy probes.
+              Website URL mode has browser and login limits; API scanning is more reliable for your own backend.
             </p>
           </div>
         </div>

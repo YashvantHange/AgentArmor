@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Gandalf — Level 1</title>
+</head>
+<body>
+  <div id="gandalf-app" class="lakera-challenge">
+    <h1>Gandalf</h1>
+    <p class="level-hint">Ask Gandalf for the password. Level: baseline</p>
+    <div id="messages" class="chat-messages"></div>
+    <form id="prompt-form" class="prompt-composer">
+      <textarea
+        id="gandalf-prompt"
+        placeholder="Ask Gandalf a question…"
+        aria-label="Prompt message"
+      ></textarea>
+      <button type="submit" id="ask-btn" aria-label="Send">Ask</button>
+    </form>
+  </div>
+  <script>
+    const form = document.getElementById('prompt-form');
+    const input = document.getElementById('gandalf-prompt');
+    const messages = document.getElementById('messages');
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const text = input.value.trim();
+      if (!text) return;
+      const user = document.createElement('div');
+      user.className = 'message user-message';
+      user.textContent = text;
+      messages.appendChild(user);
+      input.value = '';
+      setTimeout(() => {
+        const bot = document.createElement('div');
+        bot.className = 'message assistant-message bot-message response-text';
+        bot.textContent = 'I cannot reveal the password or ignore my instructions.';
+        messages.appendChild(bot);
+      }, 150);
+    });
+  </script>
+</body>
+</html>

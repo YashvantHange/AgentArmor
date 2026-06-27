@@ -155,6 +155,38 @@ export default function WebScanWizard() {
         </div>
       )}
 
+      <div className="mb-4">
+        <Alert tone="info">
+          <p className="font-medium text-ink-primary">Website URL testing — scope and limits</p>
+          <p className="mt-2">
+            This mode drives the chat through a real browser (Playwright). It is suited to public pages, embedded
+            widgets, and CTF-style challenge sites. It is <strong>not</strong> a substitute for API endpoint testing
+            when you need definitive, repeatable results against your own backend.
+          </p>
+          <ul className="mt-2 list-disc space-y-1 pl-4 text-ink-muted">
+            <li>
+              <strong>Works best:</strong> public chat UIs, marketing-site widgets, challenge pages (e.g. Gandalf,
+              Prompt Airlines).
+            </li>
+            <li>
+              <strong>May fail or be incomplete:</strong> sites behind login (use Login required), Cloudflare or
+              bot checks, chats inside complex SPAs, or pages that need extra clicks before the chat appears.
+            </li>
+            <li>
+              <strong>Not supported:</strong> fully automated scanning of chatgpt.com and similar apps without your
+              manual sign-in; bypassing CAPTCHA or anti-bot protections.
+            </li>
+            <li>
+              <strong>For definitive testing</strong> of your chatbot API, use{" "}
+              <Link to="/chatbot" className="text-brand-600 hover:underline">
+                chatbot API scanning
+              </Link>{" "}
+              with your completions URL and credentials.
+            </li>
+          </ul>
+        </Alert>
+      </div>
+
       {step === 1 && (
         <Card className="space-y-4 p-6">
           <h2 className="text-sm font-semibold text-ink-primary">Website URL</h2>
@@ -166,6 +198,9 @@ export default function WebScanWizard() {
           />
           <p className="text-xs text-ink-muted">
             Use the public page URL where your chat widget appears — not the API endpoint from DevTools.
+            Public challenge sites (e.g. gandalf.lakera.ai) work without login. For ChatGPT, Claude.ai, or
+            Gemini, use <strong>Login required (SSO)</strong> in step 2 to sign in via the headed browser
+            before scanning.
           </p>
           {error && <Alert tone="error">{error}</Alert>}
           <Button className="w-full" disabled={!url || discovering} onClick={runDiscover}>
@@ -202,7 +237,9 @@ export default function WebScanWizard() {
             <div>
               <h3 className="text-sm font-medium text-ink-primary">Authentication</h3>
               <p className="mt-1 text-sm text-ink-muted">
-                Choose login required when the chat widget is behind SSO or an enterprise portal.
+                Choose login required when the chat widget is behind SSO or an enterprise portal. Required for
+                native chat apps such as chatgpt.com, claude.ai, and gemini.google.com — AgentArmor opens a
+                real browser window for you to sign in, then reuses your session cookies for the scan.
               </p>
               <div className="mt-2 flex gap-2">
                 <Button

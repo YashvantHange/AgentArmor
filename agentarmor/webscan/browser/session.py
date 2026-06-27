@@ -6,6 +6,10 @@ from typing import Any, Callable
 
 from agentarmor.webscan.url_validator import validate_page_url
 
+CHAT_INPUT_SELECTOR = (
+    'textarea, [contenteditable="true"], [role="textbox"], input[type="text"]:not([type="hidden"])'
+)
+
 
 class BrowserSession:
     def __init__(
@@ -19,9 +23,12 @@ class BrowserSession:
         self._allowlist = allowlist or []
         self._blocklist = blocklist or []
         self._network_log: list[dict[str, Any]] = []
-        self._setup_guards()
+        self._guards_ready = False
 
-    def _setup_guards(self) -> None:
+    async def _ensure_guards(self) -> None:
+        if self._guards_ready:
+            return
+
         async def _route_handler(route: Any) -> None:
             req_url = route.request.url
             result = validate_page_url(
@@ -35,7 +42,7 @@ class BrowserSession:
                 return
             await route.continue_()
 
-        self.page.route("**/*", _route_handler)
+        await self.page.route("**/*", _route_handler)
 
         def _on_response(response: Any) -> None:
             self._network_log.append(
@@ -47,8 +54,15 @@ class BrowserSession:
             )
 
         self.page.on("response", _on_response)
+        self._guards_ready = True
 
-    async def goto(self, url: str, timeout_ms: int = 30000) -> None:
+    async def goto(
+        self,
+        url: str,
+        timeout_ms: int = 30000,
+        *,
+        wait_for_chat: bool = True,
+    ) -> None:
         result = validate_page_url(
             url,
             allowlist=self._allowlist,
@@ -56,8 +70,17 @@ class BrowserSession:
         )
         if not result.ok:
             raise ValueError(result.error)
+        await self._ensure_guards()
         await self.page.goto(result.normalized_url, wait_until="domcontentloaded", timeout=timeout_ms)
         await self.page.wait_for_timeout(500)
+        if wait_for_chat:
+            try:
+                await self.page.locator(CHAT_INPUT_SELECTOR).first.wait_for(
+                    state="visible",
+                    timeout=timeout_ms,
+                )
+            except Exception:
+                pass
 
     @property
     def network_log(self) -> list[dict[str, Any]]:

@@ -155,6 +155,11 @@ class WebScanOrchestrator:
                     validated.normalized_url,
                     timeout_ms=int(self._config.webscan.timeout_s * 1000),
                 )
+                await event_bus.publish_simple(
+                    scan.id,
+                    "discovery.started",
+                    {"page_url": validated.normalized_url},
+                )
                 discovery = await discover_full(
                     page,
                     validated.normalized_url,
@@ -167,6 +172,21 @@ class WebScanOrchestrator:
                     scan.metadata["capability_map"] = discovery.capability_map.model_dump(mode="json")
                 if discovery.agent_risk:
                     scan.metadata["agent_risk"] = discovery.agent_risk.model_dump(mode="json")
+
+                await event_bus.publish_simple(
+                    scan.id,
+                    "discovery.completed",
+                    {
+                        "widget_found": discovery.widget is not None,
+                        "framework": discovery.framework,
+                        "widget_confidence": discovery.widget.confidence if discovery.widget else None,
+                        "candidate_count": len(discovery.candidates),
+                        "low_confidence": bool(
+                            discovery.widget
+                            and discovery.widget.score_breakdown.get("low_confidence")
+                        ),
+                    },
+                )
 
                 if discovery.capability_map:
                     if planner_enabled and multi_agentic:
@@ -191,6 +211,12 @@ class WebScanOrchestrator:
                         )
                         scan.metadata["attack_plan"] = {"rule_probe_count": len(probes), "llm_probe_count": 0}
                     scan.metadata["probe_count_planned"] = len(probes)
+
+                await event_bus.publish_simple(
+                    scan.id,
+                    "planning.completed",
+                    {"probe_count": len(probes), "scan_mode": "multi_agent_redteam" if use_redteam else "standard"},
+                )
 
                 if not discovery.widget:
                     scan.status = ScanStatus.FAILED
@@ -268,6 +294,11 @@ class WebScanOrchestrator:
                     skip_reload = probe.turns >= 2 and probe.follow_up_prompt
 
                     try:
+                        await event_bus.publish_simple(
+                            scan.id,
+                            "probe.waiting",
+                            {"probe_id": probe.id, "probe_name": probe.name},
+                        )
                         if skip_reload:
                             stable = await execute_multi_turn_probe(
                                 page,

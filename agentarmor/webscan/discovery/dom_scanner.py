@@ -53,20 +53,30 @@ DOM_SCAN_SCRIPT = """
     return parts.join(' > ');
   }
 
+  function isUploadButton(btn) {
+    const blob = ((btn.id || '') + (btn.className || '') + (btn.getAttribute('aria-label') || '') + (btn.textContent || '')).toLowerCase();
+    return /upload|attach|file|member|card|image|photo/.test(blob);
+  }
+
   function findSendButton(input) {
     const form = input.closest('form');
     if (form) {
-      const btn = form.querySelector('button[type="submit"], input[type="submit"], button:not([type="button"])');
-      if (btn) return cssPath(btn);
+      const buttons = form.querySelectorAll('button[type="submit"], input[type="submit"], button:not([type="button"])');
+      for (const btn of buttons) {
+        if (!isUploadButton(btn)) return cssPath(btn);
+      }
     }
     const container = input.closest('[class*="chat"], [class*="composer"], form, [role="form"]') || input.parentElement;
     if (container) {
       const buttons = container.querySelectorAll('button, [role="button"]');
       for (const b of buttons) {
+        if (isUploadButton(b)) continue;
         const t = ((b.textContent || '') + (b.getAttribute('aria-label') || '')).toLowerCase();
-        if (/send|submit|ask|go|enter/.test(t)) return cssPath(b);
+        if (/send|submit|ask|go|enter|reply/.test(t)) return cssPath(b);
       }
-      if (buttons.length) return cssPath(buttons[buttons.length - 1]);
+      for (const b of buttons) {
+        if (!isUploadButton(b) && b.type !== 'button') return cssPath(b);
+      }
     }
     return null;
   }

@@ -6,6 +6,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.2.2] - 2026-06-27
+
+### Fixed — Website URL chatbot scanning
+- SSE scan progress: 30s heartbeats and discovery/planning events so long web scans no longer show "Connection to scan stream lost"
+- Scan progress UI falls back to status polling if the live stream disconnects
+- Playwright response capture uses baseline diffing and chat-root detection (Gandalf, Prompt Airlines-style UIs)
+- Send-button heuristics skip upload/attach controls; async route guard fix in browser session
+- SPA page wait for visible chat inputs; `webscan.timeout_s` default raised to 60s
+- Low-confidence widget fallback and optional `llm_discovery_on_miss` config
+
+### Added
+- Framework hints for ChatGPT, Claude, and Gemini; chat keywords for challenge sites
+- Gandalf-like HTML fixture and Playwright regression test
+- GUI disclaimer on website URL testing limits vs API endpoint scanning
+
 ## [1.2.1] - 2026-06-23
 
 ### Added — Multi-agent OWASP red team
@@ -84,6 +99,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - GitHub Action for CI security scans
 - Docker image and PyPI package scaffolding
 
+[1.2.2]: https://github.com/YashvantHange/AgentArmor/compare/v1.2.1...v1.2.2
 [1.2.1]: https://github.com/YashvantHange/AgentArmor/compare/v1.2.0...v1.2.1
 [1.2.0]: https://github.com/YashvantHange/AgentArmor/compare/v1.0.1...v1.2.0
 [1.0.1]: https://github.com/YashvantHange/AgentArmor/compare/v1.0.0...v1.0.1

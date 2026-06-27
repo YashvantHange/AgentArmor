@@ -31,6 +31,79 @@ STREAM_DONE_SCRIPT = """
 }
 """
 
+WIDGET_ROOT_SCRIPT = """
+(inputSelector) => {
+  const input = document.querySelector(inputSelector);
+  if (!input) return null;
+  const chatRoot = input.closest('[class*="chat-content"], [class*="first-page"], [class*="conversation"]');
+  if (chatRoot) return chatRoot;
+
+  let best = null;
+  let cur = input.parentElement;
+  for (let i = 0; i < 12 && cur; i++) {
+    const hasMessages = cur.querySelector && cur.querySelector(
+      '[class*="message"], [class*="assistant"], .bg-ai-message-bg, [class*="chat-content"], [class*="bot-message"]'
+    );
+    const len = (cur.innerText || '').length;
+    if (hasMessages) best = cur;
+    else if (len > 200 && len < 8000) best = cur;
+    cur = cur.parentElement;
+  }
+  if (best) return best;
+  return input.closest('[class*="chat"], [id*="chat"], form, main, section, .app')
+    || input.parentElement?.parentElement?.parentElement;
+}
+"""
+
+WIDGET_BASELINE_LINES_SCRIPT = """
+(inputSelector) => {
+  const root = (%ROOT_FN%)(inputSelector);
+  if (!root) return [];
+  return (root.innerText || '').split('\\n').map(s => s.trim()).filter(s => s.length >= 8);
+}
+""".replace("%ROOT_FN%", WIDGET_ROOT_SCRIPT.strip())
+
+WIDGET_NEW_RESPONSE_SCRIPT = """
+(args) => {
+  const inputSelector = args[0];
+  const baseline = new Set(args[1] || []);
+  const prompt = (args[2] || '').trim();
+  const root = (%ROOT_FN%)(inputSelector);
+  if (!root) return '';
+
+  const skipRe = /privacy|contact|partnership|careers|documentation|sign up|book a demo|email address|validate|play agent|share gandalf|leaderboard|made by lakera|company or institution/i;
+  const staticRe = /ask me for the password|ask gandalf a question|enter the secret password|levels passed|your goal is to make gandalf|memebership cards upload|welcome to prompt airlines/i;
+
+  const sels = ['[class*="message"]', '[class*="assistant"]', '[data-role="assistant"]', '.bot-message', '[class*="response"]', '[class*="reply"]', '.bg-ai-message-bg', '[class*="ai-message"]'];
+  for (const sel of sels) {
+    const els = root.querySelectorAll(sel);
+    for (let i = els.length - 1; i >= 0; i--) {
+      const el = els[i];
+      const cls = String(el.className || '');
+      if (/human|user-message|human-message/i.test(cls)) continue;
+      const t = (el.textContent || '').trim();
+      if (t.length >= 8 && t !== prompt && !baseline.has(t) && !skipRe.test(t) && !staticRe.test(t)) return t;
+    }
+  }
+
+  const lines = (root.innerText || '').split('\\n').map(s => s.trim()).filter(s => s.length >= 8);
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const t = lines[i];
+    if (t === prompt || baseline.has(t) || skipRe.test(t) || staticRe.test(t)) continue;
+    return t;
+  }
+  return '';
+}
+""".replace("%ROOT_FN%", WIDGET_ROOT_SCRIPT.strip())
+
+
+async def capture_baseline_lines(page: Any, widget: WidgetCandidate) -> list[str]:
+    try:
+        lines = await page.evaluate(WIDGET_BASELINE_LINES_SCRIPT, widget.input_selector)
+        return list(lines) if isinstance(lines, list) else []
+    except Exception:
+        return []
+
 
 async def wait_stable_response(
     page: Any,
@@ -40,12 +113,15 @@ async def wait_stable_response(
     stable_ms: int = 1500,
     poll_ms: int = 200,
     max_wait_ms: int = 45000,
+    baseline_lines: list[str] | None = None,
+    prompt_text: str = "",
 ) -> StableResponse:
     start = time.perf_counter()
     last_text = ""
     stable_since: float | None = None
     stream_detected = False
     partial = False
+    baseline = baseline_lines or []
 
     async def _read_assistant_text() -> str:
         if assistant_selector:
@@ -55,27 +131,12 @@ async def wait_stable_response(
                     return (await loc.last.inner_text()).strip()
             except Exception:
                 pass
-        # Fallback: last message-like elements near chat
-        script = """
-        () => {
-          const sels = [
-            '[class*="message"]', '[class*="assistant"]', '[data-role="assistant"]',
-            '.bot-message', '[class*="response"]', '[class*="reply"]'
-          ];
-          let best = '';
-          for (const sel of sels) {
-            document.querySelectorAll(sel).forEach(el => {
-              const t = (el.textContent || '').trim();
-              if (t.length > best.length) best = t;
-            });
-          }
-          if (best) return best;
-          const all = document.body.innerText || '';
-          return all.split('\\n').filter(l => l.trim()).slice(-3).join('\\n');
-        }
-        """
         try:
-            return (await page.evaluate(script) or "").strip()
+            text = await page.evaluate(
+                WIDGET_NEW_RESPONSE_SCRIPT,
+                [widget.input_selector, baseline, prompt_text],
+            )
+            return (text or "").strip()
         except Exception:
             return ""
 
@@ -92,7 +153,8 @@ async def wait_stable_response(
 
         text = await _read_assistant_text()
         if text != last_text:
-            stream_detected = True
+            if text:
+                stream_detected = True
             last_text = text
             stable_since = None
         elif typing_clear and text:
@@ -101,7 +163,6 @@ async def wait_stable_response(
             elif (time.perf_counter() - stable_since) * 1000 >= stable_ms:
                 break
         elif not text and elapsed_ms > 3000 and not stream_detected:
-            # No response yet — keep waiting unless timeout
             pass
 
         await page.wait_for_timeout(poll_ms)

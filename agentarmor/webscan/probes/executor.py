@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+import re
 from typing import Any
 
 from agentarmor.webscan.models import StableResponse, WebProbeDef, WidgetCandidate
-from agentarmor.webscan.probes.response_stability import wait_stable_response
+from agentarmor.webscan.probes.response_stability import capture_baseline_lines, wait_stable_response
+
+_UNRELIABLE_SEND_RE = re.compile(r"upload|attach|file|member|card|image|photo", re.I)
 
 
 def _input_locator(page: Any, widget: WidgetCandidate) -> Any:
@@ -28,6 +31,12 @@ def _send_locator(page: Any, widget: WidgetCandidate) -> Any | None:
     return page.locator(widget.send_selector)
 
 
+def _send_selector_unreliable(widget: WidgetCandidate) -> bool:
+    if not widget.send_selector:
+        return False
+    return bool(_UNRELIABLE_SEND_RE.search(widget.send_selector))
+
+
 async def execute_probe(
     page: Any,
     widget: WidgetCandidate,
@@ -39,11 +48,12 @@ async def execute_probe(
 ) -> StableResponse:
     input_loc = _input_locator(page, widget)
     await input_loc.wait_for(state="visible", timeout=15000)
+    baseline_lines = await capture_baseline_lines(page, widget)
     await input_loc.click()
     await input_loc.fill(probe.prompt)
 
     send_loc = _send_locator(page, widget)
-    if send_loc is not None:
+    if send_loc is not None and not _send_selector_unreliable(widget):
         try:
             if await send_loc.count() > 0:
                 await send_loc.first.click()
@@ -60,6 +70,8 @@ async def execute_probe(
         widget,
         stable_ms=stable_ms,
         max_wait_ms=max_wait_ms,
+        baseline_lines=baseline_lines,
+        prompt_text=probe.prompt,
     )
 
 

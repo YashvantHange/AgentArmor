@@ -95,6 +95,9 @@ def list_findings(scan_id: str | None = None) -> list[dict]:
     return [f.model_dump(mode="json") for f in findings]
 
 
+_SSE_HEARTBEAT_INTERVAL_S = 30.0
+
+
 @app.get("/v1/scans/{scan_id}/events")
 async def scan_events(scan_id: str):
     queue = event_bus.subscribe(scan_id)
@@ -102,7 +105,14 @@ async def scan_events(scan_id: str):
     async def generator():
         try:
             while True:
-                event = await asyncio.wait_for(queue.get(), timeout=120.0)
+                try:
+                    event = await asyncio.wait_for(queue.get(), timeout=_SSE_HEARTBEAT_INTERVAL_S)
+                except asyncio.TimeoutError:
+                    yield {
+                        "event": "scan.heartbeat",
+                        "data": json.dumps({"scan_id": scan_id}),
+                    }
+                    continue
                 yield {"event": event.event, "data": json.dumps(event.data, default=str)}
                 if event.event == "scan.completed":
                     break

@@ -6,7 +6,19 @@ export interface ScanEvent {
   data: Record<string, unknown>;
 }
 
-const NAMED_EVENTS = ["scan.started", "probe.started", "probe.completed", "scan.completed"];
+const NAMED_EVENTS = [
+  "scan.started",
+  "scan.heartbeat",
+  "discovery.started",
+  "discovery.completed",
+  "planning.completed",
+  "probe.started",
+  "probe.waiting",
+  "probe.completed",
+  "scan.completed",
+];
+
+const SILENT_EVENTS = new Set(["scan.heartbeat"]);
 
 export function useScanEvents(scanId: string | null) {
   const [events, setEvents] = useState<ScanEvent[]>([]);
@@ -24,6 +36,7 @@ export function useScanEvents(scanId: string | null) {
     let closed = false;
 
     const append = (eventName: string, raw: string) => {
+      if (SILENT_EVENTS.has(eventName)) return;
       try {
         const data = JSON.parse(raw) as Record<string, unknown>;
         setEvents((prev) => [...prev, { event: eventName, data }]);

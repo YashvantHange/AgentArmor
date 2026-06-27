@@ -183,9 +183,10 @@ class WebScanConfig(BaseModel):
     max_probes_per_scan: int = 30
     multi_agentic_max_probes: int = 45
     llm_discovery_min_confidence: float = 0.4
+    llm_discovery_on_miss: bool = False
     max_concurrent_browsers: int = 2
     session_ttl_hours: int = 24
-    timeout_s: float = 30.0
+    timeout_s: float = 60.0
     stable_ms: int = 1500
     max_wait_ms: int = 45000
     allowlist: list[str] = Field(default_factory=list)

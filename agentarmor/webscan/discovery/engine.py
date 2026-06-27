@@ -55,7 +55,17 @@ async def discover_widget(page: Any, page_url: str) -> DiscoveryResult:
     candidates = boost_candidates_for_framework(candidates, framework)
     candidates.sort(key=lambda c: c.confidence, reverse=True)
 
+    # Boost lone textarea pages (common on challenge sites like Gandalf)
+    textareas = [c for c in candidates if c.tag_name == "textarea"]
+    if len(textareas) == 1:
+        lone = textareas[0]
+        lone.confidence = max(lone.confidence, 0.25)
+        candidates.sort(key=lambda c: c.confidence, reverse=True)
+
     widget = candidates[0] if candidates and candidates[0].confidence >= 0.2 else None
+    if widget is None and candidates:
+        widget = candidates[0]
+        widget.score_breakdown = {**widget.score_breakdown, "low_confidence": 1.0}
     if widget and fw_name:
         widget.framework = fw_name
 
@@ -81,6 +91,8 @@ async def discover_full(
     needs_llm = use_llm_discovery and (
         not result.widget or result.widget.confidence < config.webscan.llm_discovery_min_confidence
     )
+    if not needs_llm and config.webscan.llm_discovery_on_miss and not result.widget:
+        needs_llm = True
     if needs_llm:
         from agentarmor.webscan.discovery.llm_classifier import refine_widget_with_llm
 

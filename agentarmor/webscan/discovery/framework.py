@@ -34,12 +34,18 @@ def boost_candidates_for_framework(
     if not framework or framework.get("score", 0) < 2:
         return candidates
     fw_name = framework.get("name")
+    input_hints: list[str] = list(framework.get("input_hints") or [])
     boosted: list[WidgetCandidate] = []
     for c in candidates:
         data = c.model_copy(deep=True)
         data.framework = fw_name
         data.confidence = min(1.0, data.confidence + 0.15 * min(framework["score"], 4) / 4)
         data.score_breakdown = {**data.score_breakdown, "framework": framework["score"]}
+        for hint in input_hints:
+            if hint and (c.input_selector == hint or hint in c.input_selector):
+                data.confidence = min(1.0, data.confidence + 0.2)
+                data.score_breakdown = {**data.score_breakdown, "input_hint": 1.0}
+                break
         boosted.append(data)
     boosted.sort(key=lambda x: x.confidence, reverse=True)
     return boosted

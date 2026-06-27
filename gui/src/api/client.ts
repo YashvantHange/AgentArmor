@@ -54,6 +54,9 @@ export interface ScanSummary {
     self_play?: { successful?: boolean; rounds?: number };
     redteam_trace?: Record<string, unknown>;
     redteam_summary?: Record<string, unknown>;
+    probe_count_planned?: number;
+    scan_kind?: string;
+    page_url?: string;
   };
 }
 

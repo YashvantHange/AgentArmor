@@ -6,18 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
-## [1.2.3] - 2026-06-27
-
-### Fixed
-- Windows installer filenames now match package version (`AgentArmor_1.2.3_x64-setup.exe` / `.msi`) via Tauri bundle alignment
-- `ScanSummary` metadata typing for web-scan status polling (fixes GUI production build on release CI)
-
-### Changed
-- README and release notes point to [v1.2.3](https://github.com/YashvantHange/AgentArmor/releases/tag/v1.2.3) as latest
-
 ## [1.2.2] - 2026-06-27
 
 ### Fixed — Website URL chatbot scanning
+- `ScanSummary` metadata typing for web-scan status polling (fixes GUI production build on release CI)
 - SSE scan progress: 30s heartbeats and discovery/planning events so long web scans no longer show "Connection to scan stream lost"
 - Scan progress UI falls back to status polling if the live stream disconnects
 - Playwright response capture uses baseline diffing and chat-root detection (Gandalf, Prompt Airlines-style UIs)
@@ -108,7 +100,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - GitHub Action for CI security scans
 - Docker image and PyPI package scaffolding
 
-[1.2.3]: https://github.com/YashvantHange/AgentArmor/compare/v1.2.2...v1.2.3
 [1.2.2]: https://github.com/YashvantHange/AgentArmor/compare/v1.2.1...v1.2.2
 [1.2.1]: https://github.com/YashvantHange/AgentArmor/compare/v1.2.0...v1.2.1
 [1.2.0]: https://github.com/YashvantHange/AgentArmor/compare/v1.0.1...v1.2.0

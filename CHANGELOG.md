@@ -6,7 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
-## [1.2.3] - 2026-06-28
+## [1.2.4] - 2026-06-28
 
 ### Added — GUI UX (findings, progress, export)
 - **Findings:** executive summary, excerpt-first cards sorted by severity, attack chains collapsed by default
@@ -18,6 +18,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Fixed
 - `composite_vuln_score()` crash when all assertions pass (agent scans)
 - Empty `Authorization: Bearer` header from config breaking httpx connectivity checks
+
+## [1.2.3] - 2026-06-27
+
+### Fixed
+- Tauri bundle version synced to 1.2.3 (`AgentArmor_1.2.3_x64-setup.exe` / `.msi`)
+- GUI build typing fix for web-scan status polling
 
 ## [1.2.2] - 2026-06-27
 
@@ -113,6 +119,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - GitHub Action for CI security scans
 - Docker image and PyPI package scaffolding
 
+[1.2.4]: https://github.com/YashvantHange/AgentArmor/compare/v1.2.3...v1.2.4
 [1.2.3]: https://github.com/YashvantHange/AgentArmor/compare/v1.2.2...v1.2.3
 [1.2.2]: https://github.com/YashvantHange/AgentArmor/compare/v1.2.1...v1.2.2
 [1.2.1]: https://github.com/YashvantHange/AgentArmor/compare/v1.2.0...v1.2.1

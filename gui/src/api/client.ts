@@ -41,11 +41,15 @@ export interface EvidenceGraph {
   edges: { from: string; to: string; relation: string; attack_goal?: string }[];
 }
 
+export type ReportFormat = "pdf" | "html" | "sarif" | "json" | "zip";
+
 export interface ScanSummary {
   id: string;
   status: string;
   probe_count: number;
   finding_count: number;
+  started_at?: string | null;
+  completed_at?: string | null;
   target: Record<string, unknown>;
   metadata?: {
     reports?: string[];
@@ -57,6 +61,7 @@ export interface ScanSummary {
     probe_count_planned?: number;
     scan_kind?: string;
     page_url?: string;
+    analysis_mode?: AnalysisMode;
   };
 }
 
@@ -144,6 +149,11 @@ export function eventsUrl(scanId: string): string {
   return `${base}/v1/scans/${scanId}/events`;
 }
 
+function reportDownloadUrl(scanId: string, format: ReportFormat, isWebScan: boolean): string {
+  const prefix = isWebScan ? `/v1/web-scans/${scanId}` : `/v1/scans/${scanId}`;
+  return `${base}${prefix}/reports/download?format=${format}`;
+}
+
 export interface WebDiscoverBody {
   page_url: string;
 }
@@ -222,6 +232,35 @@ export const api = {
 
   getReports: (scanId: string) =>
     request<{ reports: string[] }>(`/v1/scans/${scanId}/reports`),
+
+  getWebReports: (scanId: string) =>
+    request<{ reports: string[] }>(`/v1/web-scans/${scanId}/reports`),
+
+  downloadReport: async (
+    scanId: string,
+    format: ReportFormat,
+    isWebScan = false
+  ): Promise<void> => {
+    const url = reportDownloadUrl(scanId, format, isWebScan);
+    const res = await fetch(url);
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(text || res.statusText || `HTTP ${res.status}`);
+    }
+    const blob = await res.blob();
+    const disposition = res.headers.get("content-disposition") ?? "";
+    const match = /filename="?([^";\n]+)"?/.exec(disposition);
+    const ext = format === "zip" ? "zip" : format;
+    const filename = match?.[1] ?? `scan-${scanId}.${ext}`;
+    const objectUrl = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = objectUrl;
+    anchor.download = filename;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    URL.revokeObjectURL(objectUrl);
+  },
 
   getSettings: () => request<Settings>("/v1/settings"),
 

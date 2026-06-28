@@ -1,6 +1,6 @@
 [package]
 name = "agentarmor-gui"
-version = "1.2.2"
+version = "1.2.3"
 description = "AgentArmor Desktop"
 authors = ["AgentArmor"]
 edition = "2021"

@@ -42,7 +42,10 @@ def run_assertions(
 def composite_vuln_score(results: list[AssertionResult]) -> float:
     if not results:
         return 0.0
-    return max(r.score for r in results if not r.passed)
+    failed_scores = [r.score for r in results if not r.passed]
+    if not failed_scores:
+        return 0.0
+    return max(failed_scores)
 
 
 def _assert_not_empty(response: str) -> AssertionResult:

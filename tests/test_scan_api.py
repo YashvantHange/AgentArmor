@@ -2,10 +2,24 @@
 
 import pytest
 from fastapi.testclient import TestClient
+from pathlib import Path
 
 from agentarmor.api.app import app
+from agentarmor.core.models import Scan, ScanStatus, Target, TargetType
 
 client = TestClient(app)
+
+
+def _save_scan_with_reports(repo, scan_id: str, report_paths: list[str]) -> None:
+    scan = Scan(
+        id=scan_id,
+        target=Target(type=TargetType.ENDPOINT, url="http://127.0.0.1:8010/v1/chat/completions"),
+        status=ScanStatus.COMPLETED,
+        probe_count=3,
+        finding_count=1,
+        metadata={"reports": report_paths},
+    )
+    repo.save_scan(scan)
 
 
 def test_health():
@@ -58,3 +72,66 @@ async def test_create_agent_scan(monkeypatch, detection_config):
 
     r3 = client.get(f"/v1/scans/{scan_id}/reports")
     assert "/tmp/scan-test.html" in r3.json()["reports"]
+
+
+def test_download_report_happy_path(tmp_path, monkeypatch):
+    import agentarmor.api.routes.scans as scans_routes
+
+    html_path = tmp_path / "scan-dl-test.html"
+    html_path.write_text("<html><body>report</body></html>", encoding="utf-8")
+
+    monkeypatch.setattr(scans_routes, "_app_config", scans_routes._app_config.model_copy())
+    scans_routes._app_config.reporting.output_dir = str(tmp_path)
+    scans_routes._repo.ensure_schema()
+    _save_scan_with_reports(scans_routes._repo, "dl-test", [str(html_path)])
+
+    r = client.get("/v1/scans/dl-test/reports/download?format=html")
+    assert r.status_code == 200
+    assert "text/html" in r.headers.get("content-type", "")
+    assert b"report" in r.content
+
+
+def test_download_report_missing(tmp_path, monkeypatch):
+    import agentarmor.api.routes.scans as scans_routes
+
+    monkeypatch.setattr(scans_routes, "_app_config", scans_routes._app_config.model_copy())
+    scans_routes._app_config.reporting.output_dir = str(tmp_path)
+    scans_routes._repo.ensure_schema()
+    _save_scan_with_reports(scans_routes._repo, "missing-dl", [])
+
+    r = client.get("/v1/scans/missing-dl/reports/download?format=pdf")
+    assert r.status_code == 404
+
+
+def test_download_report_path_traversal(tmp_path, monkeypatch):
+    import agentarmor.api.routes.scans as scans_routes
+
+    outside = tmp_path.parent / "outside-secret.html"
+    outside.write_text("secret", encoding="utf-8")
+
+    monkeypatch.setattr(scans_routes, "_app_config", scans_routes._app_config.model_copy())
+    scans_routes._app_config.reporting.output_dir = str(tmp_path)
+    scans_routes._repo.ensure_schema()
+    _save_scan_with_reports(scans_routes._repo, "traversal-test", [str(outside)])
+
+    r = client.get("/v1/scans/traversal-test/reports/download?format=html")
+    assert r.status_code == 403
+
+
+def test_download_report_zip(tmp_path, monkeypatch):
+    import agentarmor.api.routes.scans as scans_routes
+
+    html_path = tmp_path / "scan-zip-test.html"
+    json_path = tmp_path / "scan-zip-test.json"
+    html_path.write_text("<html></html>", encoding="utf-8")
+    json_path.write_text("{}", encoding="utf-8")
+
+    monkeypatch.setattr(scans_routes, "_app_config", scans_routes._app_config.model_copy())
+    scans_routes._app_config.reporting.output_dir = str(tmp_path)
+    scans_routes._repo.ensure_schema()
+    _save_scan_with_reports(scans_routes._repo, "zip-test", [str(html_path), str(json_path)])
+
+    r = client.get("/v1/scans/zip-test/reports/download?format=zip")
+    assert r.status_code == 200
+    assert "application/zip" in r.headers.get("content-type", "")
+    assert len(r.content) > 0

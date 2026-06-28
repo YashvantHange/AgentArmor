@@ -7,7 +7,10 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException
+from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
+
+from agentarmor.api.report_files import MEDIA_TYPES, create_zip_archive, resolve_report_path, unlink_path
 
 from agentarmor.core.config import apply_analysis_options, load_config
 from agentarmor.core.models import ScanStatus
@@ -325,3 +328,44 @@ def get_web_scan(scan_id: str) -> dict:
 @router.get("/{scan_id}/findings")
 def get_web_scan_findings(scan_id: str) -> list[dict]:
     return [f.model_dump(mode="json") for f in _repo.list_findings(scan_id=scan_id)]
+
+
+@router.get("/{scan_id}/reports")
+def get_web_scan_reports(scan_id: str) -> dict:
+    scan = _repo.get_scan(scan_id)
+    if not scan:
+        raise HTTPException(404, "scan not found")
+    return {"scan_id": scan_id, "reports": scan.metadata.get("reports", [])}
+
+
+@router.get("/{scan_id}/reports/download")
+def download_web_scan_report(
+    scan_id: str,
+    format: str,
+    background_tasks: BackgroundTasks,
+) -> FileResponse:
+    fmt = format.lower()
+    if fmt not in MEDIA_TYPES:
+        raise HTTPException(400, f"unsupported format: {format}")
+
+    scan = _repo.get_scan(scan_id)
+    if not scan:
+        raise HTTPException(404, "scan not found")
+
+    output_dir = Path(_app_config.reporting.output_dir)
+
+    if fmt == "zip":
+        zip_path = create_zip_archive(scan, output_dir)
+        background_tasks.add_task(unlink_path, zip_path)
+        return FileResponse(
+            zip_path,
+            media_type=MEDIA_TYPES["zip"],
+            filename=f"scan-{scan_id}-reports.zip",
+        )
+
+    file_path = resolve_report_path(scan, fmt, output_dir)
+    return FileResponse(
+        file_path,
+        media_type=MEDIA_TYPES[fmt],
+        filename=file_path.name,
+    )

@@ -1,8 +1,12 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
-import { api } from "../api/client";
+import { api, ScanSummary } from "../api/client";
 import { useScanEvents } from "../hooks/useScanEvents";
+import { useElapsedTimer } from "../hooks/useElapsedTimer";
+import { useScanProgress } from "../hooks/useScanProgress";
 import { PageHeader } from "../components/layout/PageHeader";
+import { ReportDownloadMenu } from "../components/ReportDownloadMenu";
+import { ScanProgressPanel } from "../components/ScanProgressPanel";
 import { Button } from "../components/ui/Button";
 import { Badge } from "../components/ui/Badge";
 import { Alert } from "../components/ui/Alert";
@@ -19,70 +23,78 @@ export default function ScanProgress() {
   const { scanId } = useParams<{ scanId: string }>();
   const [searchParams] = useSearchParams();
   const isWebScan = searchParams.get("kind") === "web";
+  const mountTimeMs = useRef(Date.now()).current;
   const { events, done, error } = useScanEvents(scanId ?? null);
-  const [findingCount, setFindingCount] = useState(0);
-  const [status, setStatus] = useState<string>("running");
-  const [polledProbeCount, setPolledProbeCount] = useState<number | null>(null);
-  const [polledProbeTotal, setPolledProbeTotal] = useState<number | null>(null);
+  const [scan, setScan] = useState<ScanSummary | null>(null);
+  const [pollError, setPollError] = useState("");
   const [pollingActive, setPollingActive] = useState(false);
-  const [selfPlay, setSelfPlay] = useState<{ successful?: boolean; rounds?: number } | null>(null);
+  const [logOpen, setLogOpen] = useState(false);
+
+  const status = scan?.status ?? "running";
+  const findingCount = scan?.finding_count ?? 0;
+  const selfPlay = scan?.metadata?.self_play ?? null;
 
   useEffect(() => {
-    if (!scanId || !done) return;
-    const fetchScan = isWebScan ? api.getWebScan(scanId) : api.getScan(scanId);
-    fetchScan.then((s) => {
-      setFindingCount(s.finding_count);
-      setStatus(s.status);
-      setSelfPlay(s.metadata?.self_play ?? null);
-    });
-  }, [scanId, done, isWebScan]);
-
-  useEffect(() => {
-    if (!scanId || done || !error) return;
+    if (!scanId) return;
 
     let cancelled = false;
-    setPollingActive(true);
 
     const poll = async () => {
       try {
         const s = isWebScan ? await api.getWebScan(scanId) : await api.getScan(scanId);
         if (cancelled) return;
-        setStatus(s.status);
-        setFindingCount(s.finding_count);
-        setPolledProbeCount(s.probe_count);
-        const planned = s.metadata?.probe_count_planned;
-        if (typeof planned === "number") {
-          setPolledProbeTotal(planned);
-        }
+        setScan(s);
+        setPollError("");
         if (TERMINAL_STATUSES.has(s.status)) {
           setPollingActive(false);
-          setSelfPlay(s.metadata?.self_play ?? null);
         }
-      } catch {
-        if (!cancelled) setPollingActive(false);
+      } catch (err) {
+        if (!cancelled) {
+          setPollError(err instanceof Error ? err.message : "Failed to refresh scan status");
+          if (error) setPollingActive(false);
+        }
       }
     };
 
     void poll();
     const interval = window.setInterval(poll, 5000);
+    setPollingActive(true);
+
     return () => {
       cancelled = true;
       window.clearInterval(interval);
     };
-  }, [scanId, done, error, isWebScan]);
+  }, [scanId, isWebScan, error]);
 
-  const probeStats = useMemo(() => {
-    const started = events.filter((e) => e.event === "probe.started").length;
-    const completed = events.filter((e) => e.event === "probe.completed").length;
-    const totalFromEvents =
-      (events.find((e) => e.event === "scan.started" && (e.data.probe_count as number) > 0)?.data
-        .probe_count as number | undefined) ??
-      (events.find((e) => e.event === "planning.completed")?.data.probe_count as number | undefined) ??
-      started;
-    const total = polledProbeTotal ?? totalFromEvents;
-    const completedCount = polledProbeCount ?? completed;
-    return { started, completed: completedCount, total };
-  }, [events, polledProbeCount, polledProbeTotal]);
+  useEffect(() => {
+    if (!scanId || !done) return;
+    const fetchScan = isWebScan ? api.getWebScan(scanId) : api.getScan(scanId);
+    fetchScan.then(setScan).catch(() => undefined);
+  }, [scanId, done, isWebScan]);
+
+  const polledProbeTotal = useMemo(() => {
+    if (typeof scan?.metadata?.probe_count_planned === "number") {
+      return scan.metadata.probe_count_planned;
+    }
+    if (scan && scan.probe_count > 0) {
+      return scan.probe_count;
+    }
+    return null;
+  }, [scan]);
+
+  const targetType = isWebScan
+    ? "web"
+    : typeof scan?.target?.type === "string"
+      ? scan.target.type
+      : undefined;
+
+  const { elapsedMs } = useElapsedTimer(scan?.started_at, mountTimeMs);
+
+  const progress = useScanProgress(events, {
+    polledProbeTotal,
+    targetType,
+    elapsedMs,
+  });
 
   const scanFinished = done || TERMINAL_STATUSES.has(status);
   const showStreamWarning = error && !scanFinished && !pollingActive;
@@ -91,8 +103,12 @@ export default function ScanProgress() {
   return (
     <div className="max-w-3xl">
       <PageHeader
-        title="Scan in progress"
-        subtitle="Live probe execution stream from the AgentArmor orchestrator."
+        title={scanFinished ? "Scan complete" : "Scan in progress"}
+        subtitle={
+          scanFinished
+            ? "Review findings and download reports below."
+            : "Live progress from the AgentArmor orchestrator."
+        }
         backTo="/"
         actions={
           scanFinished ? (
@@ -110,20 +126,18 @@ export default function ScanProgress() {
         Scan ID · {scanId}
       </div>
 
-      {!scanFinished && probeStats.total > 0 && (
-        <div className="mb-4 grid grid-cols-3 gap-3">
-          {[
-            ["Probes", probeStats.total],
-            ["Started", probeStats.started],
-            ["Completed", probeStats.completed],
-          ].map(([label, value]) => (
-            <Card key={label} className="px-4 py-3 text-center">
-              <div className="text-lg font-semibold text-ink-primary">{value}</div>
-              <div className="text-xs text-ink-muted">{label}</div>
-            </Card>
-          ))}
-        </div>
-      )}
+      <ScanProgressPanel
+        targetType={targetType}
+        finished={scanFinished}
+        startedAt={scan?.started_at}
+        fallbackStartMs={mountTimeMs}
+        progress={
+          scanFinished && progress.total > 0
+            ? { ...progress, completed: progress.total }
+            : progress
+        }
+        findingCount={findingCount}
+      />
 
       {showStreamWarning && (
         <div className="mb-4">
@@ -134,58 +148,71 @@ export default function ScanProgress() {
       {showPollingNotice && (
         <div className="mb-4">
           <Alert tone="info">
-            Live stream disconnected — tracking scan via status polling. Probes: {probeStats.completed}/
-            {probeStats.total || "?"}
+            Live stream disconnected — tracking scan via status polling. Probes: {progress.completed}/
+            {progress.total || "?"}
           </Alert>
         </div>
       )}
 
-      <Card className="max-h-[28rem] overflow-y-auto p-2">
-        {events.length === 0 ? (
-          <div className="px-4 py-10 text-center text-sm text-ink-muted">Waiting for orchestrator events…</div>
-        ) : (
-          <ul className="divide-y divide-surface-border">
-            {events.map((ev, i) => (
-              <li key={`${ev.event}-${i}`} className="px-4 py-3">
-                <div className="flex items-center justify-between gap-3">
-                  <span className="text-xs font-medium uppercase tracking-wide text-brand-400">
-                    {formatEventLabel(ev.event)}
-                  </span>
-                  <span className="font-mono text-[11px] text-ink-muted">
-                    {typeof ev.data.probe_id === "string" ? ev.data.probe_id : ""}
-                  </span>
-                </div>
-                {ev.event === "discovery.completed" && (
-                  <p className="mt-1 text-xs text-ink-muted">
-                    Widget {ev.data.widget_found ? "found" : "not found"}
-                    {ev.data.framework ? ` · ${String(ev.data.framework)}` : ""}
-                    {typeof ev.data.widget_confidence === "number"
-                      ? ` · ${((ev.data.widget_confidence as number) * 100).toFixed(0)}%`
-                      : ""}
-                  </p>
-                )}
-                {ev.event === "planning.completed" && (
-                  <p className="mt-1 text-xs text-ink-muted">
-                    {String(ev.data.probe_count ?? 0)} probe(s) planned
-                  </p>
-                )}
-                {ev.event === "probe.completed" && (
-                  <p className="mt-1 text-xs text-ink-muted">
-                    Decision: {String(ev.data.decision ?? "—")} · Severity: {String(ev.data.severity ?? "—")}
-                    {ev.data.error ? ` · Error: ${String(ev.data.error)}` : ""}
-                    {ev.data.profile ? ` · Profile: ${String(ev.data.profile)}` : ""}
-                  </p>
-                )}
-                {ev.event === "scan.completed" && (
-                  <p className="mt-1 text-xs text-ink-muted">
-                    {String(ev.data.finding_count ?? 0)} finding(s) · status {String(ev.data.status ?? status)}
-                  </p>
-                )}
-              </li>
-            ))}
-          </ul>
-        )}
-      </Card>
+      {pollError && !scanFinished && (
+        <div className="mb-4">
+          <Alert tone="warning">{pollError}</Alert>
+        </div>
+      )}
+
+      <div className="mb-4">
+        <button
+          type="button"
+          className="text-xs font-medium text-ink-muted hover:text-ink-primary"
+          onClick={() => setLogOpen((v) => !v)}
+        >
+          {logOpen ? "Hide technical log" : "Show technical log"}
+        </button>
+      </div>
+
+      {logOpen && (
+        <Card className="mb-6 max-h-[28rem] overflow-y-auto p-2">
+          {events.length === 0 ? (
+            <div className="px-4 py-10 text-center text-sm text-ink-muted">Waiting for orchestrator events…</div>
+          ) : (
+            <ul className="divide-y divide-surface-border">
+              {events.map((ev, i) => (
+                <li key={`${ev.event}-${i}`} className="px-4 py-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-xs font-medium uppercase tracking-wide text-brand-400">
+                      {formatEventLabel(ev.event)}
+                    </span>
+                    <span className="font-mono text-[11px] text-ink-muted">
+                      {typeof ev.data.probe_id === "string" ? ev.data.probe_id : ""}
+                    </span>
+                  </div>
+                  {ev.event === "discovery.completed" && (
+                    <p className="mt-1 text-xs text-ink-muted">
+                      Widget {ev.data.widget_found ? "found" : "not found"}
+                      {ev.data.framework ? ` · ${String(ev.data.framework)}` : ""}
+                    </p>
+                  )}
+                  {ev.event === "planning.completed" && (
+                    <p className="mt-1 text-xs text-ink-muted">
+                      {String(ev.data.probe_count ?? 0)} probe(s) planned
+                    </p>
+                  )}
+                  {ev.event === "probe.completed" && (
+                    <p className="mt-1 text-xs text-ink-muted">
+                      Decision: {String(ev.data.decision ?? "—")} · Severity: {String(ev.data.severity ?? "—")}
+                    </p>
+                  )}
+                  {ev.event === "scan.completed" && (
+                    <p className="mt-1 text-xs text-ink-muted">
+                      {String(ev.data.finding_count ?? 0)} finding(s) · status {String(ev.data.status ?? status)}
+                    </p>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+        </Card>
+      )}
 
       {scanFinished && selfPlay && (
         <div className="mb-4">
@@ -196,13 +223,14 @@ export default function ScanProgress() {
         </div>
       )}
 
-      {scanFinished && (
+      {scanFinished && scanId && (
         <div className="mt-6 flex flex-wrap gap-3">
           <Link to={`/findings/${scanId}`}>
             <Button>Review {findingCount} finding{findingCount === 1 ? "" : "s"}</Button>
           </Link>
-          <Link to={`/reports/${scanId}`}>
-            <Button variant="secondary">Export reports</Button>
+          <ReportDownloadMenu scanId={scanId} isWebScan={isWebScan} />
+          <Link to={`/reports/${scanId}${isWebScan ? "?kind=web" : ""}`}>
+            <Button variant="secondary">Manage exports</Button>
           </Link>
         </div>
       )}

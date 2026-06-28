@@ -1,4 +1,4 @@
-## AgentArmor v1.2.3 — Readable findings, scan progress, and report download
+## AgentArmor v1.2.4 — Readable findings, scan progress, and report download
 
 Latest release. Makes scan results easier to understand, adds live progress with ETA, and one-click report downloads from the GUI.
 
@@ -16,7 +16,7 @@ Latest release. Makes scan results easier to understand, adds live progress with
 
 ## Windows (recommended)
 
-Download **AgentArmor_1.2.1_x64-setup.exe** or **AgentArmor_1.2.1_x64_en-US.msi** from the assets below (v1.2.3 app; installer filenames use 1.2.1).
+Download **AgentArmor_1.2.4_x64-setup.exe** or **AgentArmor_1.2.4_x64_en-US.msi** from the assets below.
 
 1. Run the installer
 2. Open **AgentArmor** — no Python install required

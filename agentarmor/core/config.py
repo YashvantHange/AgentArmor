@@ -36,6 +36,15 @@ def _substitute_env(value: Any) -> Any:
     return value
 
 
+def _sanitize_target_headers(headers: dict[str, str] | None) -> dict[str, str]:
+    """Drop Authorization when Bearer token is empty (avoids httpx illegal header)."""
+    cleaned = dict(headers or {})
+    auth = cleaned.get("Authorization", "").strip()
+    if auth.lower() in ("", "bearer", "bearer "):
+        cleaned.pop("Authorization", None)
+    return cleaned
+
+
 class EndpointEngineConfig(BaseModel):
     rate_limit_rps: float = 5.0
     timeout_s: float = 30.0
@@ -248,7 +257,7 @@ def load_config(path: Path | None = None) -> AppConfig:
     target = Target(
         type=TargetType(target_raw.get("type", "endpoint")),
         url=target_raw.get("url"),
-        headers=target_raw.get("headers", {}),
+        headers=_sanitize_target_headers(target_raw.get("headers", {})),
         model=target_raw.get("model", "gpt-3.5-turbo"),
         provider=target_raw.get("provider"),
         agent_framework=target_raw.get("agent_framework") or target_raw.get("agent"),
@@ -341,12 +350,15 @@ def apply_analysis_options(
         env_key = os.environ.get(config.detection.agentic.api_key_env, "")
         if env_key:
             config.detection.agentic.api_key = env_key
-    if auth_token:
-        config.target.headers = dict(config.target.headers or {})
-        if auth_token.lower().startswith("bearer "):
-            config.target.headers["Authorization"] = auth_token
+    if auth_token and auth_token.strip():
+        config.target.headers = _sanitize_target_headers(config.target.headers)
+        token = auth_token.strip()
+        if token.lower().startswith("bearer "):
+            config.target.headers["Authorization"] = token
         else:
-            config.target.headers["Authorization"] = f"Bearer {auth_token}"
+            config.target.headers["Authorization"] = f"Bearer {token}"
+    else:
+        config.target.headers = _sanitize_target_headers(config.target.headers)
     return config
 
 

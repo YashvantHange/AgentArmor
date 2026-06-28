@@ -6,6 +6,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.2.3] - 2026-06-28
+
+### Added — GUI UX (findings, progress, export)
+- **Findings:** executive summary, excerpt-first cards sorted by severity, attack chains collapsed by default
+- **Scan progress:** live stopwatch, progress bar, ETA, human probe labels; technical SSE log collapsed
+- **Reports:** one-click download (PDF, HTML, SARIF, JSON, ZIP) from Findings, Progress, and Reports pages
+- `GET /v1/scans/{id}/reports/download` and mirrored web-scan endpoint with path traversal guard
+- Tauri-only **Open folder** action; browser dev mode uses blob download only
+
+### Fixed
+- `composite_vuln_score()` crash when all assertions pass (agent scans)
+- Empty `Authorization: Bearer` header from config breaking httpx connectivity checks
+
 ## [1.2.2] - 2026-06-27
 
 ### Fixed — Website URL chatbot scanning
@@ -100,6 +113,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - GitHub Action for CI security scans
 - Docker image and PyPI package scaffolding
 
+[1.2.3]: https://github.com/YashvantHange/AgentArmor/compare/v1.2.2...v1.2.3
 [1.2.2]: https://github.com/YashvantHange/AgentArmor/compare/v1.2.1...v1.2.2
 [1.2.1]: https://github.com/YashvantHange/AgentArmor/compare/v1.2.0...v1.2.1
 [1.2.0]: https://github.com/YashvantHange/AgentArmor/compare/v1.0.1...v1.2.0

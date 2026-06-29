@@ -109,7 +109,7 @@ export function sortFindings(findings: Finding[]): Finding[] {
   });
 }
 
-function findingExcerpt(finding: Finding): string {
+export function findingExcerpt(finding: Finding): string {
   const firstEvidence = finding.evidence?.find((e) => e.trim());
   if (firstEvidence?.trim()) {
     return firstEvidence.trim();

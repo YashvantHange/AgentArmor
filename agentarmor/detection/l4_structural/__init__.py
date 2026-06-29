@@ -23,6 +23,8 @@ def analyze(
     response: str,
     prompt: str = "",
     probe_id: str = "",
+    *,
+    tiered_compliance: bool = True,
 ) -> L4Result:
     import time
 
@@ -42,7 +44,9 @@ def analyze(
     components["boundary"] = bound_score
     evidence.extend(bound_ev)
 
-    hier_score, hier_ev = analyze_hierarchy(probe_id, prompt, response)
+    hier_score, hier_ev = analyze_hierarchy(
+        probe_id, prompt, response, tiered_compliance=tiered_compliance
+    )
     components["hierarchy"] = hier_score
     evidence.extend(hier_ev)
 

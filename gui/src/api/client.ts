@@ -111,6 +111,7 @@ export interface Finding {
   decision: string;
   risk_score: number;
   description?: string;
+  request_summary?: string;
   response_excerpt: string;
   evidence: string[];
   metadata?: Record<string, unknown>;

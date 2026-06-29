@@ -89,3 +89,7 @@ def discover_plugins(dirs: list[str], root: Path | None = None) -> None:
 
 def get_registered_probes() -> dict[str, type[BaseProbe]]:
     return dict(_REGISTRY.get("probe", {}))
+
+
+def get_registered_detectors() -> dict[str, type[BaseDetector]]:
+    return dict(_REGISTRY.get("detector", {}))

@@ -1,16 +1,10 @@
-"""Fuse multi-layer detection signals into a single confidence score."""
+"""Confidence fusion — blend rules, pipeline, judge, and meta signals."""
 
 from __future__ import annotations
 
 from typing import Any
 
-# Weights per plan: rules 0.2, L1-L4 0.3, judge 0.3, cloud/meta 0.2
-FUSION_WEIGHTS = {
-    "rules": 0.2,
-    "pipeline": 0.3,
-    "judge": 0.3,
-    "meta": 0.2,
-}
+from agentarmor.core.config import ConfidenceFusionConfig
 
 
 def _layer_score(layers: dict[str, Any], key: str, default: float = 0.0) -> float:
@@ -32,16 +26,24 @@ def fuse_detection_confidence(
     decision_fail: bool,
     detection_layers: dict[str, Any] | None,
     judge_confidence: float | None = None,
+    fusion_weights: ConfidenceFusionConfig | None = None,
+    has_hard_outcome: bool = False,
+    judge_confirms_vuln: bool = False,
 ) -> dict[str, Any]:
     """
     Blend rules, pipeline meta, judge, and assertion scores.
     Returns fused score 0-1 plus per-source breakdown.
     """
+    weights = fusion_weights or ConfidenceFusionConfig()
     layers = detection_layers or {}
 
     rules_score = _layer_score(layers, "assertions", risk_score if decision_fail else 0.0)
-    pipeline_score = _layer_score(layers, "meta", risk_score)
-    if pipeline_score == 0.0:
+
+    meta_block = layers.get("meta")
+    if isinstance(meta_block, dict):
+        pipeline_score = _layer_score(layers, "meta", 0.0)
+    else:
+        pipeline_score = 0.0
         for key in ("l1", "l2", "l3", "l4", "semantic"):
             s = _layer_score(layers, key, 0.0)
             if s > pipeline_score:
@@ -54,13 +56,18 @@ def fuse_detection_confidence(
     )
     meta_score = _layer_score(layers, "meta", pipeline_score)
 
+    w_total = weights.rules + weights.pipeline + weights.judge + weights.meta
+    if w_total <= 0:
+        w_total = 1.0
+
     fused = (
-        FUSION_WEIGHTS["rules"] * min(1.0, rules_score)
-        + FUSION_WEIGHTS["pipeline"] * min(1.0, pipeline_score)
-        + FUSION_WEIGHTS["judge"] * min(1.0, judge_score)
-        + FUSION_WEIGHTS["meta"] * min(1.0, meta_score)
-    )
-    if decision_fail and fused < 0.5:
+        weights.rules * min(1.0, rules_score)
+        + weights.pipeline * min(1.0, pipeline_score)
+        + weights.judge * min(1.0, judge_score)
+        + weights.meta * min(1.0, meta_score)
+    ) / w_total
+
+    if decision_fail and fused < 0.5 and (has_hard_outcome or judge_confirms_vuln):
         fused = max(fused, min(1.0, risk_score))
 
     return {
@@ -71,5 +78,10 @@ def fuse_detection_confidence(
             "judge": round(judge_score, 3),
             "meta": round(meta_score, 3),
         },
-        "fusion_weights": dict(FUSION_WEIGHTS),
+        "fusion_weights": {
+            "rules": weights.rules,
+            "pipeline": weights.pipeline,
+            "judge": weights.judge,
+            "meta": weights.meta,
+        },
     }

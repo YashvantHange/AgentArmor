@@ -41,6 +41,7 @@ class L1Result:
     categories: list[str]
     engine: str
     latency_ms: float = 0.0
+    evidence_spans: list[dict] | None = None
 
 
 def scan(text: str) -> L1Result:
@@ -67,6 +68,24 @@ def scan(text: str) -> L1Result:
         categories=result.categories,
         engine=result.engine,
         latency_ms=latency_ms,
+        evidence_spans=list(result.evidence_spans or []),
+    )
+
+
+def scan_with_echo_filter(text: str, echo_spans: list | None) -> L1Result:
+    import time
+
+    start = time.perf_counter()
+    result: L1ScanResult = python_scan(text, echo_spans=echo_spans)
+    _warn_fallback_once()
+    latency_ms = (time.perf_counter() - start) * 1000
+    return L1Result(
+        score=result.score,
+        matches=result.matches,
+        categories=result.categories,
+        engine=result.engine,
+        latency_ms=latency_ms,
+        evidence_spans=list(result.evidence_spans or []),
     )
 
 

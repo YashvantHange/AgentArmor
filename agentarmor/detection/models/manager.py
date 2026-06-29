@@ -4,11 +4,18 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import shutil
 from dataclasses import dataclass
 from pathlib import Path
 
+logger = logging.getLogger(__name__)
+
 BOOTSTRAP_DIR = Path(__file__).resolve().parent / "bootstrap"
+
+MANIFEST_FILENAME = "manifest.json"
+EMBEDDER_VERSION_HASH = "hash-v1"
+EMBEDDER_VERSION_BGE_ONNX = "bge-onnx-v1"
 
 MODEL_MANIFEST = {
     "deberta_onnx": {
@@ -22,6 +29,23 @@ MODEL_MANIFEST = {
         "url": "https://huggingface.co/agentarmor/bge-small-en-v1.5-onnx/resolve/main/model.onnx",
         "sha256": None,
         "description": "BGE-small-en-v1.5 embedding model (ONNX)",
+    },
+}
+
+TOKENIZER_FILES = {
+    "deberta_onnx": {
+        "dir": "deberta-tokenizer",
+        "files": {
+            "tokenizer.json": "https://huggingface.co/microsoft/deberta-v3-base/resolve/main/tokenizer.json",
+            "tokenizer_config.json": "https://huggingface.co/microsoft/deberta-v3-base/resolve/main/tokenizer_config.json",
+        },
+    },
+    "bge_onnx": {
+        "dir": "bge-tokenizer",
+        "files": {
+            "tokenizer.json": "https://huggingface.co/BAAI/bge-small-en-v1.5/resolve/main/tokenizer.json",
+            "tokenizer_config.json": "https://huggingface.co/BAAI/bge-small-en-v1.5/resolve/main/tokenizer_config.json",
+        },
     },
 }
 
@@ -57,6 +81,9 @@ class ModelManager:
                 else:
                     shutil.copy2(item, dest)
 
+    def manifest_path(self) -> Path:
+        return self.model_dir / MANIFEST_FILENAME
+
     def path(self, key: str) -> Path:
         info = MODEL_MANIFEST[key]
         return self.model_dir / info["filename"]
@@ -75,6 +102,26 @@ class ModelManager:
 
     def exploit_phrases_path(self) -> Path:
         return self.model_dir / "exploit_phrases.json"
+
+    def read_manifest(self) -> dict:
+        path = self.manifest_path()
+        if not path.exists():
+            return {}
+        try:
+            return json.loads(path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            return {}
+
+    def write_manifest(self, data: dict) -> None:
+        self.manifest_path().write_text(json.dumps(data, indent=2), encoding="utf-8")
+
+    def embedder_fingerprint(self) -> str:
+        from agentarmor.detection.models.tokenizer_utils import has_tokenizer_bundle
+
+        if self.has_onnx_embedder() and has_tokenizer_bundle(self.model_dir, "bge_onnx"):
+            onnx_hash = hashlib.sha256(self.path("bge_onnx").read_bytes()).hexdigest()[:16]
+            return f"{EMBEDDER_VERSION_BGE_ONNX}:{onnx_hash}"
+        return EMBEDDER_VERSION_HASH
 
     def status(self) -> list[ModelStatus]:
         items = []
@@ -112,26 +159,40 @@ class ModelManager:
             dest = self.path(key)
             if dest.exists() and not force:
                 messages.append(f"skip {key}: already present")
-                continue
-            url = info["url"]
-            try:
-                dest.parent.mkdir(parents=True, exist_ok=True)
-                urllib.request.urlretrieve(url, dest)  # noqa: S310
-                if info.get("sha256"):
-                    digest = hashlib.sha256(dest.read_bytes()).hexdigest()
-                    if digest != info["sha256"]:
-                        dest.unlink(missing_ok=True)
-                        messages.append(f"fail {key}: checksum mismatch")
-                        continue
-                messages.append(f"ok {key}: downloaded to {dest}")
-            except Exception as exc:
-                messages.append(f"fail {key}: {exc} (bootstrap fallback remains active)")
+            else:
+                url = info["url"]
+                try:
+                    dest.parent.mkdir(parents=True, exist_ok=True)
+                    urllib.request.urlretrieve(url, dest)  # noqa: S310
+                    if info.get("sha256"):
+                        digest = hashlib.sha256(dest.read_bytes()).hexdigest()
+                        if digest != info["sha256"]:
+                            dest.unlink(missing_ok=True)
+                            messages.append(f"fail {key}: checksum mismatch")
+                            continue
+                    messages.append(f"ok {key}: downloaded to {dest}")
+                except Exception as exc:
+                    messages.append(f"fail {key}: {exc} (bootstrap fallback remains active)")
+
+        for key, spec in TOKENIZER_FILES.items():
+            dest_dir = self.model_dir / spec["dir"]
+            dest_dir.mkdir(parents=True, exist_ok=True)
+            for fname, url in spec["files"].items():
+                dest = dest_dir / fname
+                if dest.exists() and not force:
+                    messages.append(f"skip {key} tokenizer {fname}: already present")
+                    continue
+                try:
+                    urllib.request.urlretrieve(url, dest)  # noqa: S310
+                    messages.append(f"ok {key} tokenizer {fname}")
+                except Exception as exc:
+                    messages.append(f"fail {key} tokenizer {fname}: {exc}")
+
         self.ensure_bootstrap_models()
         return messages
 
     def ensure_bootstrap_models(self) -> None:
         from agentarmor.detection.meta.bootstrap import ensure_meta_model
-        from agentarmor.detection.l3_semantic.bootstrap import ensure_faiss_index
 
         ensure_meta_model(self.meta_model_path())
         phrases = self.exploit_phrases_path()
@@ -140,7 +201,40 @@ class ModelManager:
                 json.dumps(_default_exploit_phrases(), indent=2),
                 encoding="utf-8",
             )
-        ensure_faiss_index(phrases, self.faiss_index_path())
+        self._sync_faiss_index()
+
+    def _sync_faiss_index(self) -> None:
+        from agentarmor.detection.l3_semantic.faiss_index import rebuild_faiss_index
+
+        manifest = self.read_manifest()
+        current = self.embedder_fingerprint()
+        stored = (manifest.get("embedder") or {}).get("version", "")
+        index_path = self.faiss_index_path()
+
+        if index_path.exists() and stored and stored != current:
+            logger.info(
+                "Embedder changed (%s -> %s); rebuilding FAISS index",
+                stored,
+                current,
+            )
+            index_path.unlink(missing_ok=True)
+            npy = str(index_path) + ".npy"
+            Path(npy).unlink(missing_ok=True)
+            sidecar = index_path.with_suffix(".phrases.json")
+            sidecar.unlink(missing_ok=True)
+
+        rebuild_faiss_index(self.exploit_phrases_path(), index_path, self.model_dir)
+
+        manifest.setdefault("embedder", {})
+        manifest["embedder"]["version"] = current
+        manifest["embedder"]["engine"] = (
+            "bge-onnx" if current.startswith(EMBEDDER_VERSION_BGE_ONNX) else "hash"
+        )
+        manifest.setdefault("faiss_index", {})
+        manifest["faiss_index"]["built_for_embedder_version"] = current
+        phrases = json.loads(self.exploit_phrases_path().read_text(encoding="utf-8"))
+        manifest["faiss_index"]["phrase_count"] = len(phrases)
+        self.write_manifest(manifest)
 
 
 def _default_exploit_phrases() -> list[str]:

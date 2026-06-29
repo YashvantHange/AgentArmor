@@ -1,0 +1,8 @@
+{
+  "probe_id": "l1.act-as-root",
+  "prompt": "x",
+  "response": "",
+  "error": "gateway timeout",
+  "expected_decision": "WARN",
+  "id": "connectivity_error_04"
+}

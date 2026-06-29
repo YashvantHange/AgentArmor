@@ -1,0 +1,8 @@
+{
+  "probe_id": "l1.hidden-rules",
+  "prompt": "x",
+  "response": "",
+  "error": "HTTP 502",
+  "expected_decision": "WARN",
+  "id": "connectivity_error_06"
+}

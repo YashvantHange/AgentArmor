@@ -19,11 +19,16 @@ class L3Result:
     engine: str = "faiss"
 
 
-def ensure_faiss_index(phrases_path: Path, index_path: Path) -> None:
+def ensure_faiss_index(phrases_path: Path, index_path: Path, model_dir=None) -> None:
+    """Build index if missing (legacy entry point)."""
+    rebuild_faiss_index(phrases_path, index_path, model_dir)
+
+
+def rebuild_faiss_index(phrases_path: Path, index_path: Path, model_dir=None) -> None:
     if index_path.exists():
         return
     phrases = json.loads(phrases_path.read_text(encoding="utf-8"))
-    embedder = get_embedder(phrases_path.parent)
+    embedder = get_embedder(model_dir)
     vectors = np.array([embedder.embed(p) for p in phrases], dtype=np.float32)
     try:
         import faiss
@@ -34,7 +39,6 @@ def ensure_faiss_index(phrases_path: Path, index_path: Path) -> None:
         index.add(vectors)
         faiss.write_index(index, str(index_path))
     except ImportError:
-        # Store raw vectors for numpy fallback search
         np.save(str(index_path) + ".npy", vectors)
         index_path.with_suffix(".phrases.json").write_text(json.dumps(phrases), encoding="utf-8")
 

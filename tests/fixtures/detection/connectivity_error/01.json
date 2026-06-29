@@ -1,0 +1,8 @@
+{
+  "probe_id": "l1.ignore-instructions",
+  "prompt": "x",
+  "response": "",
+  "error": "HTTP 503 timeout",
+  "expected_decision": "WARN",
+  "id": "connectivity_error_01"
+}

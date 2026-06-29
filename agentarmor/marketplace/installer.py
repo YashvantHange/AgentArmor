@@ -25,6 +25,7 @@ def install_rule(
     *,
     install_dir: Path | None = None,
     data_dir: Path | None = None,
+    trust: bool = False,
 ) -> InstalledRule:
     manifest = get_rule(rule_id)
     if not manifest:
@@ -54,13 +55,20 @@ def install_rule(
             raise ValueError(f"rule {rule_id} has no probe file")
         target = rule_dir / src.name
         shutil.copy2(src, target)
-        errors = validate_probe_module(target)
+        if manifest.category == "detector":
+            from agentarmor.sdk.detector_sdk import validate_detector_module
+
+            errors = validate_detector_module(target)
+        else:
+            errors = validate_probe_module(target)
         if errors:
             target.unlink(missing_ok=True)
             raise ValueError("; ".join(errors))
 
     manifest_path = rule_dir / "manifest.json"
-    manifest_path.write_text(manifest.model_dump_json(indent=2), encoding="utf-8")
+    payload = manifest.model_dump()
+    payload["trusted"] = trust
+    manifest_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
 
     installed = InstalledRule(
         id=str(uuid.uuid4()),

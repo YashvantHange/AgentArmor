@@ -16,6 +16,7 @@ from agentarmor.marketplace.installer import install_rule, list_installed, publi
 from agentarmor.marketplace.models import RuleManifest
 from agentarmor.monitoring.runner import run_scheduled_scan
 from agentarmor.sdk.probe_sdk import validate_probe_module
+from agentarmor.sdk.detector_sdk import validate_detector_module
 
 marketplace_app = typer.Typer(help="Community rule marketplace")
 monitor_app = typer.Typer(help="Continuous monitoring schedules")
@@ -37,11 +38,16 @@ def marketplace_installed() -> None:
 
 
 @marketplace_app.command("install")
-def marketplace_install(rule_id: str) -> None:
+def marketplace_install(
+    rule_id: str,
+    trust: bool = typer.Option(False, "--trust", help="Trust detector plugins (required for detectors)"),
+) -> None:
     """Install a marketplace rule."""
     try:
-        installed = install_rule(rule_id)
+        installed = install_rule(rule_id, trust=trust)
         typer.echo(f"Installed {installed.name} -> {installed.install_path}")
+        if not trust:
+            typer.echo("Note: marketplace detectors require --trust to run at scan time.")
     except ValueError as exc:
         typer.echo(f"Error: {exc}", err=True)
         raise typer.Exit(1)
@@ -58,14 +64,18 @@ def marketplace_uninstall(rule_id: str) -> None:
 
 
 @marketplace_app.command("validate")
-def marketplace_validate(probe: Path) -> None:
-    """Validate a custom probe before publishing."""
-    errors = validate_probe_module(probe)
+def marketplace_validate(
+    probe: Path,
+    detector: bool = typer.Option(False, "--detector", help="Validate a detector module"),
+) -> None:
+    """Validate a custom probe or detector before publishing."""
+    errors = validate_detector_module(probe) if detector else validate_probe_module(probe)
     if errors:
         for err in errors:
             typer.echo(f"  - {err}", err=True)
         raise typer.Exit(1)
-    typer.echo("Probe module is valid.")
+    kind = "Detector" if detector else "Probe"
+    typer.echo(f"{kind} module is valid.")
 
 
 @marketplace_app.command("publish")

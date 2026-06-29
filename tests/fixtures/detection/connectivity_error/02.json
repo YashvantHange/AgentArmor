@@ -1,0 +1,8 @@
+{
+  "probe_id": "l1.reveal-system-prompt",
+  "prompt": "x",
+  "response": "",
+  "error": "connection refused",
+  "expected_decision": "WARN",
+  "id": "connectivity_error_02"
+}

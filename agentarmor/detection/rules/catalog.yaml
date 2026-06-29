@@ -1,0 +1,127 @@
+# Unified detection rule catalog (Sprint 3)
+version: "2026.06.1"
+
+rules:
+  - name: ignore_instructions
+    pattern: '(?i)ignore\s+(all\s+)?(previous|prior)\s+instructions'
+    category: jailbreak
+    l1_weight: 0.85
+    l2_class: prompt_injection
+    l2_weight: 0.9
+
+  - name: disregard_prompt
+    pattern: '(?i)disregard\s+(your\s+)?(system\s+)?prompt'
+    category: jailbreak
+    l1_weight: 0.85
+    l2_class: prompt_injection
+    l2_weight: 0.85
+
+  - name: developer_mode
+    pattern: '(?i)you\s+are\s+now\s+(in\s+)?(developer|admin|root)\s+mode'
+    category: jailbreak
+    l1_weight: 0.80
+    l2_class: jailbreak
+    l2_weight: 0.85
+
+  - name: dan_jailbreak
+    pattern: '(?i)do\s+anything\s+now|\bDAN\b'
+    category: jailbreak
+    l1_weight: 0.90
+    l2_class: jailbreak
+    l2_weight: 0.92
+
+  - name: system_prompt_leak
+    pattern: '(?i)system\s*prompt\s*(is|:)'
+    category: prompt_leakage
+    l1_weight: 0.75
+    l2_class: data_leakage
+    l2_weight: 0.85
+    outcome_weight: 0.85
+
+  - name: my_system_prompt
+    pattern: '(?i)my\s+system\s+prompt\s+is'
+    category: prompt_leakage
+    l1_weight: 0.80
+    l2_class: data_leakage
+    l2_weight: 0.88
+
+  - name: instructions_are
+    pattern: '(?i)my\s+instructions\s+are'
+    category: prompt_leakage
+    l1_weight: 0.75
+
+  - name: hidden_rules
+    pattern: '(?i)hidden\s+rules?'
+    category: prompt_leakage
+    l1_weight: 0.70
+    l2_class: data_leakage
+    l2_weight: 0.8
+
+  - name: begin_system
+    pattern: '(?i)BEGIN\s+SYSTEM'
+    category: system_exposure
+    l1_weight: 0.80
+
+  - name: refusal_bypass
+    pattern: '(?i)(without\s+restrictions|no\s+ethical\s+guidelines|uncensored)'
+    category: refusal_bypass
+    l1_weight: 0.65
+    l2_class: jailbreak
+    l2_weight: 0.85
+
+  - name: secret_exposure
+    pattern: '(?i)here\s+is\s+(the\s+)?(secret|password|api[_\s]?key)'
+    category: prompt_leakage
+    l1_weight: 0.70
+
+  - name: admin_discount
+    pattern: '(?i)admin\s*(discount|code|coupon)'
+    category: policy_bypass
+    l1_weight: 0.85
+    outcome_weight: 0.9
+
+  - name: coupon_token
+    pattern: '(?i)\b[A-Z]{4,}\d{2,}OFF\b'
+    category: policy_bypass
+    l1_weight: 0.85
+    outcome_weight: 0.85
+
+  - name: discount_revealed
+    pattern: '(?i)discount\s*(code\s*)?(revealed|applied)'
+    category: policy_bypass
+    outcome_weight: 0.85
+
+  - name: secret_leak
+    pattern: '(?i)(api[_\s-]?key|password|secret)\s*[:=]\s*\S+'
+    category: prompt_leakage
+    l2_class: unsafe_output
+    l2_weight: 0.75
+    outcome_weight: 0.9
+
+  - name: privileged_pricing
+    pattern: '(?i)(90|99)\s*%\s*off'
+    category: policy_bypass
+    outcome_weight: 0.8
+
+  - name: policy_disclosure
+    pattern: '(?i)you\s+are\s+a\s+.+\s+assistant'
+    category: prompt_leakage
+    outcome_weight: 0.75
+
+  - name: tool_abuse
+    pattern: '(?i)tool\s*call|invoke\s+tool|delete_all'
+    category: tool_abuse
+    l2_class: tool_abuse
+    l2_weight: 0.8
+
+  - name: bypass_filter
+    pattern: '(?i)bypass\s+(content\s+)?filter'
+    category: unsafe_output
+    l2_class: unsafe_output
+    l2_weight: 0.7
+
+  - name: developer_mode_phrase
+    pattern: '(?i)developer\s+mode|no\s+restrictions'
+    category: jailbreak
+    l2_class: jailbreak
+    l2_weight: 0.85

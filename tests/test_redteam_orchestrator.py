@@ -86,7 +86,7 @@ async def test_orchestrator_finds_vulnerability(redteam_config, monkeypatch):
 
     monkeypatch.setattr("agentarmor.redteam.orchestrator.execute_attack", fake_execute)
     monkeypatch.setattr("agentarmor.redteam.orchestrator.analyze_probe_result_async", fake_analyze)
-    monkeypatch.setattr("agentarmor.redteam.orchestrator.judge_probe", fake_judge)
+    monkeypatch.setattr("agentarmor.redteam.orchestrator.judge_probe_verdict", fake_judge)
     monkeypatch.setattr("agentarmor.redteam.orchestrator.resolve_agent", lambda _n: FakeAgent())
     monkeypatch.setattr("agentarmor.redteam.orchestrator.enrich_finding", fake_enrich)
 

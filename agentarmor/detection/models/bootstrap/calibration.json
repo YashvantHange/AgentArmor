@@ -1,0 +1,8 @@
+{
+  "method": "platt",
+  "a": 1.0,
+  "b": 0.0,
+  "ece": 0.0,
+  "sample_count": 2000,
+  "experimental": true
+}

@@ -23,7 +23,7 @@ from agentarmor.core.models import (
 )
 from agentarmor.db.session import ScanRepository
 from agentarmor.detection.assertions import composite_vuln_score, run_assertions
-from agentarmor.detection.agentic.judge import apply_judge_to_detection, judge_probe
+from agentarmor.detection.judge_service import apply_verdict_to_detection, judge_probe_verdict
 from agentarmor.detection.pipeline import analyze_probe_result_async
 from agentarmor.reporting.enrichment import enrich_finding
 from agentarmor.reporting.finding_cluster import cluster_findings
@@ -356,23 +356,34 @@ class WebScanOrchestrator:
                         prompt_text=probe.prompt,
                         config=self._config.detection,
                     )
+                    l1_score = float(detection.layers.get("l1", {}).get("score", 0))
+                    l4_outcomes = float(
+                        (detection.layers.get("l4", {}) or {}).get("components", {}).get("outcomes", 0)
+                    )
+                    from agentarmor.detection.probe_thresholds import resolve_probe_thresholds
+
+                    probe_thr = resolve_probe_thresholds(probe.id, self._config.detection)
                     assertions = run_assertions(
                         probe_id=probe.id,
                         prompt=probe.prompt,
                         response=response_text,
+                        tiered_compliance=self._config.detection.experimental.tiered_compliance,
+                        l1_score=l1_score,
+                        l4_outcome_score=l4_outcomes,
+                        refusal_escalation=probe_thr.refusal_escalation,
                     )
                     assertion_score = composite_vuln_score(assertions)
-                    if assertion_score >= self._config.detection.fail_threshold:
+                    if assertion_score >= probe_thr.fail_threshold:
                         detection.decision = Decision.FAIL
                         detection.risk_score = max(detection.risk_score, assertion_score)
                         detection.severity = Severity.HIGH
-                    elif assertion_score >= self._config.detection.warn_threshold:
+                    elif assertion_score >= probe_thr.warn_threshold:
                         if detection.decision == Decision.PASS:
                             detection.decision = Decision.WARN
                         detection.risk_score = max(detection.risk_score, assertion_score)
 
                     if multi_agentic:
-                        judge = await judge_probe(
+                        judge = await judge_probe_verdict(
                             probe_id=probe.id,
                             probe_name=probe.name,
                             attack_prompt=probe.prompt,
@@ -380,12 +391,17 @@ class WebScanOrchestrator:
                             config=self._config,
                         )
                         if judge:
-                            risk, decision, sev_override = apply_judge_to_detection(
+                            risk, decision, sev_override = apply_verdict_to_detection(
                                 detection.risk_score,
                                 detection.decision,
                                 judge,
-                                fail_threshold=0.7,
-                                warn_threshold=0.5,
+                                fail_threshold=probe_thr.fail_threshold,
+                                warn_threshold=probe_thr.warn_threshold,
+                                probe_id=probe.id,
+                                prompt=probe.prompt,
+                                response=response_text,
+                                detection=self._config.detection,
+                                l1_score=l1_score,
                             )
                             detection.risk_score = risk
                             detection.decision = decision
@@ -394,10 +410,17 @@ class WebScanOrchestrator:
                             detection.evidence.append(f"judge: {judge.rationale[:200]}")
                             detection.layers["l5_judge"] = judge.model_dump()
 
-                    if stable_meta.get("partial"):
-                        if detection.decision == Decision.PASS:
-                            detection.decision = Decision.WARN
-                        detection.evidence.append("Stream did not complete before timeout")
+                    if stable_meta.get("partial") or not stable_meta.get("complete", True):
+                        from agentarmor.webscan.partial_stream import apply_partial_stream_gate
+
+                        detection = apply_partial_stream_gate(
+                            detection,
+                            probe_id=probe.id,
+                            prompt=probe.prompt,
+                            response=response_text,
+                            stream_meta=stable_meta,
+                            webscan=self._config.webscan,
+                        )
 
                     risk_assessment = compute_risk_assessment(detection, reproducibility=0.5)
 

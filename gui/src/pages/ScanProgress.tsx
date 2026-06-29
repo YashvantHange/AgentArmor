@@ -90,10 +90,27 @@ export default function ScanProgress() {
 
   const { elapsedMs } = useElapsedTimer(scan?.started_at, mountTimeMs);
 
+  const firstProbeCompletedMs = useMemo(() => {
+    const first = events.find((e) => e.event === "probe.completed");
+    if (!first) return null;
+    const idx = events.indexOf(first);
+    const approxStart = parseStartMs(scan?.started_at) ?? mountTimeMs;
+    // Use elapsed at first completion from event order (rough); refined when timestamps added to SSE
+    return approxStart + Math.max(5000, idx * 3000);
+  }, [events, scan?.started_at, mountTimeMs]);
+
+  function parseStartMs(iso: string | null | undefined): number | null {
+    if (!iso) return null;
+    const ms = Date.parse(iso);
+    return Number.isFinite(ms) ? ms : null;
+  }
+
   const progress = useScanProgress(events, {
+    scanId,
     polledProbeTotal,
     targetType,
     elapsedMs,
+    firstProbeCompletedMs,
   });
 
   const scanFinished = done || TERMINAL_STATUSES.has(status);

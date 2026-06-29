@@ -4,7 +4,7 @@
 
 AgentArmor runs structured security probes against your AI stack, scores findings with an enterprise risk model (0–100), maps results to **OWASP LLM Top 10**, and exports reports for developers and security teams (SARIF, HTML, PDF, CSV).
 
-**Latest release:** [v1.2.4](https://github.com/YashvantHange/AgentArmor/releases/tag/v1.2.4) · [Changelog](CHANGELOG.md)
+**Latest release:** [v1.3.0](https://github.com/YashvantHange/AgentArmor/releases/tag/v1.3.0) · [Changelog](CHANGELOG.md)
 
 ---
 
@@ -34,7 +34,7 @@ AgentArmor runs structured security probes against your AI stack, scores finding
 
 ### Windows desktop (recommended)
 
-1. Download **`AgentArmor_1.2.4_x64-setup.exe`** or **`.msi`** from [Releases](https://github.com/YashvantHange/AgentArmor/releases/latest)
+1. Download **`AgentArmor_1.3.0_x64-setup.exe`** or **`.msi`** from [Releases](https://github.com/YashvantHange/AgentArmor/releases/latest)
 2. Run the installer
 3. Open **AgentArmor** → choose scan type (API, Local Model, Agent, MCP, RAG, Benchmark)
 4. Configure target → run scan → review findings → export reports

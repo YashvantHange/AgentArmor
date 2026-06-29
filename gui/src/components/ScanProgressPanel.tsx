@@ -1,5 +1,5 @@
-import { formatEtaMs, useElapsedTimer } from "../hooks/useElapsedTimer";
-import { ScanProgressState, scanStatusLabel } from "../hooks/useScanProgress";
+import { useElapsedTimer } from "../hooks/useElapsedTimer";
+import { progressEtaLabel, ScanProgressState, scanStatusLabel } from "../hooks/useScanProgress";
 import { Card } from "./ui/Card";
 
 export function ScanProgressPanel({
@@ -20,10 +20,7 @@ export function ScanProgressPanel({
   const { formatted } = useElapsedTimer(startedAt, fallbackStartMs);
   const pct =
     progress.total > 0 ? Math.min(100, Math.round((progress.completed / progress.total) * 100)) : 0;
-  const etaLabel =
-    progress.etaMs !== null && progress.completed >= 2
-      ? formatEtaMs(progress.etaMs)
-      : progress.fallbackEtaLabel;
+  const etaLabel = finished ? "" : progressEtaLabel(progress);
 
   return (
     <div className="mb-6 space-y-4">
@@ -37,7 +34,7 @@ export function ScanProgressPanel({
               </span>
             )}
             <p className="text-sm font-medium text-ink-primary">
-              {scanStatusLabel(targetType, finished)}
+              {scanStatusLabel(targetType, finished, progress.scanPhase)}
             </p>
           </div>
           <p className="font-mono text-sm tabular-nums text-ink-muted">{formatted}</p>
@@ -65,6 +62,9 @@ export function ScanProgressPanel({
                 </span>
                 {!finished && <span>{etaLabel}</span>}
               </div>
+              {!finished && progress.remainingLabel && (
+                <p className="mt-1 text-xs text-ink-muted">{progress.remainingLabel}</p>
+              )}
             </>
           )}
         </div>

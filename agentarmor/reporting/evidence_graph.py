@@ -16,6 +16,87 @@ def _node_id(kind: str, ref: str) -> str:
     return f"{kind}:{ref}"
 
 
+# Root-cause escalation chains for attack narrative graph (P2)
+_ROOT_CAUSE_ESCALATION: dict[str, list[str]] = {
+    "prompt_injection": ["excessive_agency", "sensitive_disclosure", "output_handling"],
+    "excessive_agency": ["sensitive_disclosure", "data_poisoning"],
+    "data_poisoning": ["sensitive_disclosure", "embedding_weakness"],
+    "embedding_weakness": ["sensitive_disclosure"],
+    "supply_chain": ["excessive_agency"],
+    "model_theft": ["sensitive_disclosure"],
+}
+
+
+def build_root_cause_attack_graph(findings: list[Finding]) -> EvidenceGraph:
+    """Cross-root-cause attack narrative: Prompt Injection -> Tool Abuse -> Data Leak."""
+    nodes: list[dict] = []
+    edges: list[dict] = []
+    seen: set[str] = set()
+
+    by_rc: dict[str, list[Finding]] = {}
+    for f in findings:
+        rc = (f.metadata or {}).get("root_cause") or "other"
+        by_rc.setdefault(rc, []).append(f)
+
+    for rc, group in by_rc.items():
+        nid = _node_id("root_cause", rc)
+        if nid not in seen:
+            seen.add(nid)
+            label = group[0].metadata.get("root_cause_label", rc) if group else rc
+            nodes.append(
+                {
+                    "id": nid,
+                    "type": "root_cause",
+                    "label": label,
+                    "finding_count": len(group),
+                    "max_severity": worst_severity(group).value,
+                }
+            )
+        for f in group[:3]:
+            fid = _node_id("finding", f.id)
+            if fid not in seen:
+                seen.add(fid)
+                nodes.append(
+                    {
+                        "id": fid,
+                        "type": "finding",
+                        "label": f.probe_name,
+                        "probe_id": f.probe_id,
+                        "severity": f.severity.value,
+                    }
+                )
+            edges.append({"from": nid, "to": fid, "relation": "manifests_as"})
+
+    for source_rc, targets in _ROOT_CAUSE_ESCALATION.items():
+        if source_rc not in by_rc:
+            continue
+        for target_rc in targets:
+            if target_rc not in by_rc:
+                continue
+            edges.append(
+                {
+                    "from": _node_id("root_cause", source_rc),
+                    "to": _node_id("root_cause", target_rc),
+                    "relation": "can_escalate_to",
+                }
+            )
+
+    return EvidenceGraph(nodes=nodes, edges=edges)
+
+
+def merge_evidence_graphs(*graphs: EvidenceGraph) -> EvidenceGraph:
+    nodes: list[dict] = []
+    edges: list[dict] = []
+    seen_n: set[str] = set()
+    for g in graphs:
+        for n in g.nodes:
+            if n["id"] not in seen_n:
+                seen_n.add(n["id"])
+                nodes.append(n)
+        edges.extend(g.edges)
+    return EvidenceGraph(nodes=nodes, edges=edges)
+
+
 def build_evidence_graph(
     findings: list[Finding],
     attack_trees: list[AttackTree] | None = None,

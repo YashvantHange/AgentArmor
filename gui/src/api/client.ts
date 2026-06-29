@@ -34,6 +34,21 @@ export interface ScanCreateBody {
   self_play_discovery_enabled?: boolean;
   self_play_defender_enabled?: boolean;
   scan_mode?: "standard" | "multi_agent_redteam";
+  scan_depth?: string;
+  planner_v2?: boolean;
+  finding_groups?: boolean;
+  scan_profile?: string;
+  owasp_ids?: string[];
+}
+
+export interface ScanProfile {
+  id: string;
+  name: string;
+  description: string;
+  target_types: string[];
+  owasp_ids: string[];
+  scan_depth: string;
+  scan_mode: string;
 }
 
 export interface EvidenceGraph {
@@ -224,6 +239,11 @@ export const api = {
       method: "POST",
       body: JSON.stringify(body),
     }),
+
+  listScanProfiles: (targetType?: string) =>
+    request<ScanProfile[]>(
+      `/v1/scans/profiles${targetType ? `?target_type=${encodeURIComponent(targetType)}` : ""}`
+    ),
 
   getScan: (id: string) => request<ScanSummary>(`/v1/scans/${id}`),
 

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { formatDurationMs } from "../lib/scanProgressUtils";
 
 function parseStartMs(iso: string | null | undefined): number | null {
   if (!iso) return null;
@@ -18,18 +19,9 @@ export function useElapsedTimer(startedAt: string | null | undefined, fallbackSt
   }, [startMs]);
 
   const elapsedMs = startMs !== null ? Math.max(0, now - startMs) : 0;
-  const totalSeconds = Math.floor(elapsedMs / 1000);
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = totalSeconds % 60;
-  const formatted = `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+  const formatted = formatDurationMs(elapsedMs);
 
   return { elapsedMs, formatted, active: startMs !== null };
 }
 
-export function formatEtaMs(etaMs: number | null): string {
-  if (etaMs === null || !Number.isFinite(etaMs) || etaMs <= 0) return "";
-  const totalSeconds = Math.ceil(etaMs / 1000);
-  if (totalSeconds < 60) return `~${totalSeconds}s remaining`;
-  const minutes = Math.ceil(totalSeconds / 60);
-  return `~${minutes} min remaining`;
-}
+export { formatEtaMs } from "../lib/scanProgressUtils";

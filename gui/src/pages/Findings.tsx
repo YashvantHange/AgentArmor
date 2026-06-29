@@ -111,6 +111,12 @@ export default function Findings() {
             const excerpt = findingExcerpt(f);
             const e = getEnrichment(f);
             const owaspIds = e?.owasp?.map((o) => o.id) ?? f.owasp;
+            const meta = f.metadata as Record<string, unknown> | undefined;
+            const clusterSize = typeof meta?.cluster_size === "number" ? meta.cluster_size : 0;
+            const confidence =
+              typeof meta?.detection_confidence === "number"
+                ? Math.round(meta.detection_confidence * 100)
+                : null;
             return (
               <Card key={f.id} hover className="w-full p-4" onClick={() => setSelected(f)}>
                 <div className="flex items-start justify-between gap-4">
@@ -119,6 +125,14 @@ export default function Findings() {
                     <div className="mt-1.5 flex flex-wrap items-center gap-2">
                       <Badge tone={severityTone(f.severity)}>{f.severity}</Badge>
                       <span className="text-xs text-ink-muted">Risk {formatRiskScore(f)}</span>
+                      {confidence !== null && (
+                        <span className="text-xs text-ink-muted">Confidence {confidence}%</span>
+                      )}
+                      {clusterSize > 1 && (
+                        <Badge tone="default" className="text-[10px]">
+                          +{clusterSize - 1} related probes
+                        </Badge>
+                      )}
                     </div>
                     <p
                       className={`mt-3 line-clamp-2 text-sm ${

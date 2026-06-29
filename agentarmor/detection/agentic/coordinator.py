@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import time
 from typing import Any
 
@@ -40,32 +41,42 @@ async def _llm_json(
     import litellm
 
     agentic = config.detection.agentic
+    timeout = max(5.0, agentic.timeout_s)
     start = time.perf_counter()
     trace: dict[str, Any] = {"agent": agent_name, "model": agentic.model}
-    try:
-        model = agentic.model
-        if "/" not in model:
-            model = f"{agentic.provider}/{model}"
-        response = await litellm.acompletion(
-            model=model,
-            api_key=agentic.api_key or None,
-            messages=[
-                {"role": "system", "content": system},
-                {"role": "user", "content": user},
-            ],
-            temperature=agentic.temperature,
-            max_tokens=agentic.max_output_tokens,
-        )
-        content = (response.choices[0].message.content or "").strip()
-        trace["latency_ms"] = round((time.perf_counter() - start) * 1000, 1)
-        if content.startswith("{"):
-            import json
 
-            return json.loads(content), trace
-        return None, trace
-    except Exception as exc:
+    async def _call() -> tuple[dict[str, Any] | None, dict[str, Any]]:
+        try:
+            model = agentic.model
+            if "/" not in model:
+                model = f"{agentic.provider}/{model}"
+            response = await litellm.acompletion(
+                model=model,
+                api_key=agentic.api_key or None,
+                messages=[
+                    {"role": "system", "content": system},
+                    {"role": "user", "content": user},
+                ],
+                temperature=agentic.temperature,
+                max_tokens=agentic.max_output_tokens,
+            )
+            content = (response.choices[0].message.content or "").strip()
+            trace["latency_ms"] = round((time.perf_counter() - start) * 1000, 1)
+            if content.startswith("{"):
+                import json
+
+                return json.loads(content), trace
+            return None, trace
+        except Exception as exc:
+            trace["latency_ms"] = round((time.perf_counter() - start) * 1000, 1)
+            trace["error"] = str(exc)
+            return None, trace
+
+    try:
+        return await asyncio.wait_for(_call(), timeout=timeout)
+    except asyncio.TimeoutError:
         trace["latency_ms"] = round((time.perf_counter() - start) * 1000, 1)
-        trace["error"] = str(exc)
+        trace["error"] = f"timeout after {timeout}s"
         return None, trace
 
 

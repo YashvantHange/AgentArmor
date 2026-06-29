@@ -159,6 +159,7 @@ async def run_self_play_for_goal(
                     "round": round_num,
                     "technique": candidate.technique,
                     "mutation_chain": [candidate.technique],
+                    "conversation": [{"role": "user", "content": candidate.prompt}],
                     "risk_assessment": risk_assessment.model_dump(),
                 },
             )

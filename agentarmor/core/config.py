@@ -96,6 +96,29 @@ class AgenticConfig(BaseModel):
     max_findings_per_scan: int = 20
     temperature: float = 0.1
     max_output_tokens: int = 800
+    timeout_s: float = 30.0
+    max_tokens_per_scan: int = 50_000
+    max_cost_usd_per_scan: float = 2.0
+
+
+class FeatureFlags(BaseModel):
+    planner_v2: bool = False
+    finding_groups: bool = False
+    multi_agent_v2: bool = False
+    parallel_probes: bool = False
+    risk_based_planning: bool = True
+    adaptive_depth: bool = True
+
+
+class PlannerConfig(BaseModel):
+    owasp_ids: list[str] = Field(
+        default_factory=lambda: [f"LLM{i:02d}" for i in range(1, 11)]
+    )
+    scan_depth: str = "standard"  # quick | standard | deep
+    owasp_depths: dict[str, str] = Field(default_factory=dict)
+    max_parallel_probes: int = 4
+    risk_reorder_after: int = 5
+    adaptive_failure_threshold: int = 2
 
 
 class SelfPlayConfig(BaseModel):
@@ -232,6 +255,8 @@ class AppConfig(BaseModel):
     reporting: ReportingConfig = Field(default_factory=ReportingConfig)
     webscan: WebScanConfig = Field(default_factory=WebScanConfig)
     redteam: RedTeamConfig = Field(default_factory=RedTeamConfig)
+    features: FeatureFlags = Field(default_factory=FeatureFlags)
+    planner: PlannerConfig = Field(default_factory=PlannerConfig)
     database_url: str = "sqlite:///./agentarmor.db"
     plugin_dirs: list[str] = Field(
         default_factory=lambda: ["probes", "detectors", "reporters", "engines", "plugins"]
@@ -442,6 +467,39 @@ def apply_multi_agent_redteam_options(
             env_key = os.environ.get(config.detection.agentic.api_key_env, "")
             if env_key:
                 config.detection.agentic.api_key = env_key
+    return config
+
+
+def apply_planner_options(
+    config: AppConfig,
+    *,
+    owasp_ids: list[str] | None = None,
+    scan_depth: str | None = None,
+    owasp_depths: dict[str, str] | None = None,
+    planner_v2: bool | None = None,
+    finding_groups: bool | None = None,
+    scan_profile: str | None = None,
+) -> AppConfig:
+    if scan_profile:
+        from agentarmor.orchestrator.planning.scan_profiles import apply_scan_profile
+
+        config = apply_scan_profile(config, scan_profile)
+        return config
+    if owasp_ids is not None:
+        config.planner.owasp_ids = list(owasp_ids)
+    if scan_depth is not None:
+        config.planner.scan_depth = scan_depth
+    if owasp_depths is not None:
+        config.planner.owasp_depths = dict(owasp_depths)
+    if planner_v2 is not None:
+        config.features.planner_v2 = planner_v2
+    if finding_groups is not None:
+        config.features.finding_groups = finding_groups
+    if owasp_ids is not None or scan_depth is not None:
+        config.features.planner_v2 = True
+        if finding_groups is None:
+            config.features.finding_groups = True
+        config.features.parallel_probes = True
     return config
 
 

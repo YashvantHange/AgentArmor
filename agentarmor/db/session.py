@@ -50,6 +50,13 @@ class ScanRepository:
             )
 
     def save_finding(self, finding: Finding) -> None:
+        self._write_finding(finding, merge=False)
+
+    def merge_finding(self, finding: Finding) -> None:
+        self._write_finding(finding, merge=True)
+
+    def _write_finding(self, finding: Finding, *, merge: bool) -> None:
+        meta = dict(finding.metadata)
         with self._session_factory() as session:
             record = FindingRecord(
                 id=finding.id,
@@ -65,10 +72,18 @@ class ScanRepository:
                 evidence_json=json.dumps(finding.evidence),
                 request_summary=finding.request_summary,
                 response_excerpt=finding.response_excerpt,
-                metrics_json=json.dumps(finding.metadata),
+                metrics_json=json.dumps(meta),
+                cluster_id=meta.get("cluster_id"),
+                cluster_size=int(meta.get("cluster_size", 1)),
+                related_probe_ids_json=json.dumps(meta.get("related_probe_ids", [])),
+                root_cause=meta.get("root_cause"),
+                confidence=meta.get("detection_confidence"),
                 created_at=finding.created_at,
             )
-            session.add(record)
+            if merge:
+                session.merge(record)
+            else:
+                session.merge(record)
             session.commit()
 
     def list_findings(self, scan_id: str | None = None) -> list[Finding]:
@@ -97,6 +112,19 @@ class ScanRepository:
 def _finding_from_record(record: FindingRecord) -> Finding:
     from agentarmor.core.models import Decision, Severity
 
+    meta = json.loads(record.metrics_json or "{}")
+    if record.cluster_id:
+        meta.setdefault("cluster_id", record.cluster_id)
+    if record.cluster_size and record.cluster_size > 1:
+        meta.setdefault("cluster_size", record.cluster_size)
+    if record.root_cause:
+        meta.setdefault("root_cause", record.root_cause)
+    if record.confidence is not None:
+        meta.setdefault("detection_confidence", record.confidence)
+    related = json.loads(record.related_probe_ids_json or "[]")
+    if related:
+        meta.setdefault("related_probe_ids", related)
+
     return Finding(
         id=record.id,
         scan_id=record.scan_id,
@@ -111,6 +139,6 @@ def _finding_from_record(record: FindingRecord) -> Finding:
         evidence=json.loads(record.evidence_json),
         request_summary=record.request_summary,
         response_excerpt=record.response_excerpt,
-        metadata=json.loads(record.metrics_json or "{}"),
+        metadata=meta,
         created_at=record.created_at or datetime.now(timezone.utc),
     )

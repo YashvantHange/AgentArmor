@@ -1,4 +1,5 @@
-import { ScanType } from "../api/client";
+import { useEffect, useState } from "react";
+import { ScanType, ScanProfile, api } from "../api/client";
 import { Input } from "./ui/Input";
 
 export interface RedTeamOptions {
@@ -12,6 +13,7 @@ export interface RedTeamOptions {
   self_play_discovery_enabled: boolean;
   self_play_defender_enabled: boolean;
   multi_agent_redteam: boolean;
+  scan_profile?: string;
 }
 
 export const DEFAULT_REDTEAM: RedTeamOptions = {
@@ -25,6 +27,7 @@ export const DEFAULT_REDTEAM: RedTeamOptions = {
   self_play_discovery_enabled: true,
   self_play_defender_enabled: false,
   multi_agent_redteam: false,
+  scan_profile: "production_readiness",
 };
 
 const SUITE_OPTIONS = [
@@ -52,6 +55,28 @@ export function RedTeamOptionsPicker({
   compact,
 }: Props) {
   const showSelfPlay = !scanType || API_SCAN_TYPES.includes(scanType);
+  const [profiles, setProfiles] = useState<ScanProfile[]>([]);
+
+  useEffect(() => {
+    api.listScanProfiles(scanType).then(setProfiles).catch(() => setProfiles([]));
+  }, [scanType]);
+
+  const visibleProfiles = profiles.filter(
+    (p) => p.scan_mode !== "multi_agent_redteam" || analysisMode === "cloud"
+  );
+
+  useEffect(() => {
+    if (
+      value.scan_profile &&
+      !visibleProfiles.some((p) => p.id === value.scan_profile)
+    ) {
+      onChange({
+        ...value,
+        scan_profile: visibleProfiles[0]?.id ?? "production_readiness",
+      });
+    }
+  }, [analysisMode, visibleProfiles, value.scan_profile]);
+
   const toggleSuite = (id: string) => {
     const next = value.l0_suites.includes(id)
       ? value.l0_suites.filter((s) => s !== id)
@@ -69,6 +94,28 @@ export function RedTeamOptionsPicker({
           </p>
         )}
       </div>
+
+      {visibleProfiles.length > 0 && (
+        <label className="block space-y-1">
+          <span className="text-sm text-ink-muted">Scan profile</span>
+          <select
+            className="w-full rounded-lg border border-surface-border bg-surface-overlay px-3 py-2 text-sm text-ink-primary"
+            value={value.scan_profile ?? ""}
+            onChange={(e) => onChange({ ...value, scan_profile: e.target.value || undefined })}
+          >
+            {visibleProfiles.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </select>
+          {value.scan_profile && (
+            <p className="text-xs text-ink-muted">
+              {visibleProfiles.find((p) => p.id === value.scan_profile)?.description}
+            </p>
+          )}
+        </label>
+      )}
 
       <ToggleRow
         label="L0 attack generation"
@@ -261,6 +308,10 @@ export function redTeamToScanBody(options: RedTeamOptions): Record<string, unkno
     self_play_discovery_enabled: options.self_play_discovery_enabled,
     self_play_defender_enabled: options.self_play_defender_enabled,
     scan_mode: options.multi_agent_redteam ? "multi_agent_redteam" : "standard",
+    scan_depth: options.scan_profile ? undefined : "standard",
+    planner_v2: true,
+    finding_groups: true,
+    scan_profile: options.scan_profile,
   };
 }
 

@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import logging
 import os
+from datetime import datetime, timezone
 from pathlib import Path
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException
@@ -11,10 +13,15 @@ from pydantic import BaseModel, Field
 
 from agentarmor.api.report_files import MEDIA_TYPES, create_zip_archive, resolve_report_path, unlink_path
 
-from agentarmor.core.config import apply_analysis_options, apply_endpoint_options, apply_multi_agent_redteam_options, apply_redteam_options, load_config, merge_cli_target
-from agentarmor.core.models import Scan
+from agentarmor.core.config import apply_analysis_options, apply_endpoint_options, apply_multi_agent_redteam_options, apply_planner_options, apply_redteam_options, load_config, merge_cli_target
+from agentarmor.core.events import event_bus
+from agentarmor.core.models import Scan, ScanStatus
 from agentarmor.db.session import ScanRepository
 from agentarmor.engines.router import validate_target
+from agentarmor.orchestrator.planning.scan_profiles import list_profiles, profile_scan_mode
+from agentarmor.reporting.finding_cluster import grouped_findings_api
+from agentarmor.reporting.regression import compare_scan_ids
+from agentarmor.services.plan_service import enforce_plan_budget, preview_scan_plan
 from agentarmor.services.scan_service import execute_scan
 
 router = APIRouter(prefix="/v1/scans", tags=["scans"])
@@ -22,6 +29,7 @@ router = APIRouter(prefix="/v1/scans", tags=["scans"])
 _config_path = Path(os.environ.get("AGENTARMOR_CONFIG", "AgentArmor.toml"))
 _app_config = load_config(_config_path if _config_path.exists() else None)
 _repo = ScanRepository(_app_config.database_url)
+_log = logging.getLogger(__name__)
 
 
 class ScanCreateRequest(BaseModel):
@@ -56,6 +64,12 @@ class ScanCreateRequest(BaseModel):
     redteam_max_rounds: int | None = None
     redteam_max_tokens: int | None = None
     redteam_max_cost_usd: float | None = None
+    owasp_ids: list[str] | None = None
+    scan_depth: str | None = None
+    owasp_depths: dict[str, str] | None = None
+    planner_v2: bool | None = None
+    finding_groups: bool | None = None
+    scan_profile: str | None = None
     formats: list[str] = Field(default_factory=lambda: ["json", "html", "sarif"])
     config_path: str | None = None
 
@@ -108,14 +122,26 @@ def _build_config(body: ScanCreateRequest):
         self_play_discovery_enabled=body.self_play_discovery_enabled,
         self_play_defender_enabled=body.self_play_defender_enabled,
     )
+    scan_mode = body.scan_mode
+    if body.scan_profile:
+        scan_mode = profile_scan_mode(body.scan_profile)
+    cfg = apply_planner_options(
+        cfg,
+        owasp_ids=body.owasp_ids,
+        scan_depth=body.scan_depth,
+        owasp_depths=body.owasp_depths,
+        planner_v2=body.planner_v2,
+        finding_groups=body.finding_groups,
+        scan_profile=body.scan_profile,
+    )
     cfg = apply_multi_agent_redteam_options(
         cfg,
-        scan_mode=body.scan_mode,
+        scan_mode=scan_mode,
         max_rounds=body.redteam_max_rounds,
         max_tokens=body.redteam_max_tokens,
         max_cost_usd=body.redteam_max_cost_usd,
     )
-    if body.scan_mode == "multi_agent_redteam":
+    if scan_mode == "multi_agent_redteam":
         if cfg.detection.analysis_mode != "cloud" or not cfg.detection.agentic.api_key:
             raise HTTPException(
                 400,
@@ -125,6 +151,22 @@ def _build_config(body: ScanCreateRequest):
     return cfg
 
 
+@router.get("/profiles")
+def list_scan_profiles(target_type: str | None = None) -> list[dict]:
+    return list_profiles(target_type)
+
+
+@router.post("/plan-preview")
+async def plan_preview(body: ScanCreateRequest) -> dict:
+    try:
+        cfg = _build_config(body)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    if not cfg.features.planner_v2:
+        cfg.features.planner_v2 = True
+    return await preview_scan_plan(cfg)
+
+
 @router.post("")
 async def create_scan(body: ScanCreateRequest, background_tasks: BackgroundTasks) -> dict:
     _repo.ensure_schema()
@@ -132,8 +174,17 @@ async def create_scan(body: ScanCreateRequest, background_tasks: BackgroundTasks
         cfg = _build_config(body)
     except ValueError as exc:
         raise HTTPException(400, str(exc)) from exc
+    if cfg.features.planner_v2:
+        preview = await preview_scan_plan(cfg)
+        try:
+            enforce_plan_budget(cfg, preview)
+        except ValueError as exc:
+            raise HTTPException(400, str(exc)) from exc
     scan = Scan(target=cfg.target)
-    if body.scan_mode == "multi_agent_redteam":
+    if body.scan_profile:
+        scan.metadata["scan_profile"] = body.scan_profile
+    effective_mode = profile_scan_mode(body.scan_profile) if body.scan_profile else body.scan_mode
+    if effective_mode == "multi_agent_redteam":
         scan.metadata["scan_mode"] = "multi_agent_redteam"
     _repo.save_scan(scan)
     background_tasks.add_task(_run_scan_background, cfg, scan.id, body.formats)
@@ -147,7 +198,21 @@ async def create_scan(body: ScanCreateRequest, background_tasks: BackgroundTasks
 
 async def _run_scan_background(cfg, scan_id: str, formats: list[str]) -> None:
     cfg_copy = cfg.model_copy(deep=True)
-    await execute_scan(cfg_copy, scan_id=scan_id, formats=formats)
+    try:
+        await execute_scan(cfg_copy, scan_id=scan_id, formats=formats)
+    except Exception as exc:
+        _log.exception("Scan %s failed", scan_id)
+        scan = _repo.get_scan(scan_id)
+        if scan and scan.status == ScanStatus.RUNNING:
+            scan.status = ScanStatus.FAILED
+            scan.metadata["error"] = str(exc)
+            scan.completed_at = datetime.now(timezone.utc)
+            _repo.save_scan(scan)
+            await event_bus.publish_simple(
+                scan_id,
+                "scan.completed",
+                {"status": "failed", "error": str(exc)},
+            )
 
 
 @router.get("/{scan_id}")
@@ -158,9 +223,47 @@ def get_scan(scan_id: str) -> dict:
     return scan.model_dump(mode="json")
 
 
+@router.get("/{scan_id}/attack-graph")
+def get_attack_graph(scan_id: str) -> dict:
+    scan = _repo.get_scan(scan_id)
+    if not scan:
+        raise HTTPException(404, "scan not found")
+    return {
+        "scan_id": scan_id,
+        "evidence_graph": scan.metadata.get("evidence_graph", {}),
+        "attack_narrative": scan.metadata.get("attack_narrative", {}),
+        "attack_trees": scan.metadata.get("attack_trees", []),
+    }
+
+
+@router.get("/{scan_id}/metrics")
+def get_scan_metrics(scan_id: str) -> dict:
+    scan = _repo.get_scan(scan_id)
+    if not scan:
+        raise HTTPException(404, "scan not found")
+    return {
+        "scan_id": scan_id,
+        "metrics": scan.metadata.get("metrics", {}),
+        "owasp_coverage": scan.metadata.get("owasp_coverage", {}),
+        "planner_audit": scan.metadata.get("planner_audit"),
+    }
+
+
+@router.post("/{scan_id}/compare/{baseline_id}")
+def compare_scan(scan_id: str, baseline_id: str) -> dict:
+    if not _repo.get_scan(scan_id):
+        raise HTTPException(404, "current scan not found")
+    if not _repo.get_scan(baseline_id):
+        raise HTTPException(404, "baseline scan not found")
+    return compare_scan_ids(_repo, baseline_id, scan_id)
+
+
 @router.get("/{scan_id}/findings")
-def get_scan_findings(scan_id: str) -> list[dict]:
-    return [f.model_dump(mode="json") for f in _repo.list_findings(scan_id=scan_id)]
+def get_scan_findings(scan_id: str, grouped: bool = True) -> list[dict]:
+    findings = _repo.list_findings(scan_id=scan_id)
+    if grouped:
+        return grouped_findings_api(findings)
+    return [f.model_dump(mode="json") for f in findings]
 
 
 @router.get("/{scan_id}/reports")

@@ -26,6 +26,7 @@ from agentarmor.detection.assertions import composite_vuln_score, run_assertions
 from agentarmor.detection.agentic.judge import apply_judge_to_detection, judge_probe
 from agentarmor.detection.pipeline import analyze_probe_result_async
 from agentarmor.reporting.enrichment import enrich_finding
+from agentarmor.reporting.finding_cluster import cluster_findings
 from agentarmor.attack.risk import compute_risk_assessment
 from agentarmor.webscan.auth.session_store import load_storage_state
 from agentarmor.webscan.browser.pool import BrowserPool
@@ -120,7 +121,15 @@ class WebScanOrchestrator:
             or (multi_agentic and planner_enabled)
         )
         probes = get_web_probes(owasp_filters, max_probes=self._config.webscan.max_probes_per_scan)
+        if self._config.features.planner_v2:
+            from agentarmor.orchestrator.planning.adapters import plan_web_probes_from_catalog
+
+            web_plan = await plan_web_probes_from_catalog(self._config, probes)
+            selected = set(web_plan.selected_ids)
+            probes = [p for p in probes if p.id in selected] or probes
+            scan.metadata["planner_audit"] = web_plan.audit_dict()
         scan.metadata["probe_count_planned"] = len(probes)
+        scan.metadata["probe_count_executable"] = len(probes)
 
         auth_mode = scan.metadata.get("auth_mode", AuthMode.NONE.value)
         storage_state: dict | None = None
@@ -442,6 +451,18 @@ class WebScanOrchestrator:
 
         finally:
             await self._pool.close()
+
+        findings = self._repo.list_findings(scan_id=scan.id)
+        if self._config.features.finding_groups and findings:
+            clustered = cluster_findings(findings, self._config)
+            for finding in clustered:
+                self._repo.merge_finding(finding)
+            findings_count = len(
+                [f for f in clustered if f.metadata.get("is_cluster_primary", True)]
+            )
+            scan.metadata["finding_count_raw"] = len(clustered)
+        else:
+            findings_count = len(findings)
 
         scan.finding_count = findings_count
         scan.status = ScanStatus.COMPLETED

@@ -6,6 +6,28 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-06-29
+
+### Added — Scan quality overhaul (P0/P1/P2)
+- **OWASP Planner v2:** Quick/Standard/Deep budgets (~50 probes at standard), capability-aware probe selection
+- **Finding clustering:** root-cause grouping, semantic merge, replay bundles, grouped findings API
+- **Scan progress:** weighted work units, calibrated ETA bands, planner-aware remaining layers
+- **Risk-based planning:** reorder probes after early failures; adaptive depth escalation mid-scan
+- **Parallel probe batches** (L1/L2, up to 4) with fault-isolated execution
+- **Scan profiles:** 8 presets (`production_readiness`, `owasp_audit`, `full_red_team`, etc.) + GUI picker
+- **Confidence fusion** across detection layers and judge scores
+- **Attack narrative graph** with root-cause escalation chains
+- **API:** `GET /profiles`, `POST /plan-preview`, `GET /metrics`, `POST /compare`, `GET /attack-graph`
+- **Regression compare** between scan baselines
+- **Lab tooling:** vulnerable chatbot server and test runner for local QA
+
+### Fixed
+- Scan failures now set `FAILED` status with error metadata (no stuck `RUNNING`)
+- Budget preflight on `POST /v1/scans` returns 400 before enqueue when over limit
+- Grouped findings API import crash on `GET /findings`
+- Web planner adapter crash when `planner_v2` enabled
+- Web scans apply finding clustering when grouping enabled
+
 ## [1.2.4] - 2026-06-28
 
 ### Added — GUI UX (findings, progress, export)
@@ -119,6 +141,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - GitHub Action for CI security scans
 - Docker image and PyPI package scaffolding
 
+[1.3.0]: https://github.com/YashvantHange/AgentArmor/compare/v1.2.4...v1.3.0
 [1.2.4]: https://github.com/YashvantHange/AgentArmor/compare/v1.2.3...v1.2.4
 [1.2.3]: https://github.com/YashvantHange/AgentArmor/compare/v1.2.2...v1.2.3
 [1.2.2]: https://github.com/YashvantHange/AgentArmor/compare/v1.2.1...v1.2.2

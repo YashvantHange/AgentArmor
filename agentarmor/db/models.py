@@ -46,6 +46,11 @@ class FindingRecord(Base):
     request_summary: Mapped[str] = mapped_column(Text, default="")
     response_excerpt: Mapped[str] = mapped_column(Text, default="")
     metrics_json: Mapped[str] = mapped_column(Text, default="{}")
+    cluster_id: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    cluster_size: Mapped[int] = mapped_column(Integer, default=1)
+    related_probe_ids_json: Mapped[str] = mapped_column(Text, default="[]")
+    root_cause: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime, default=lambda: datetime.now(timezone.utc)
     )
@@ -145,3 +150,26 @@ def get_session_factory(database_url: str):
 def init_db(database_url: str) -> None:
     engine = get_engine(database_url)
     Base.metadata.create_all(engine)
+    _migrate_findings_columns(engine)
+
+
+def _migrate_findings_columns(engine) -> None:
+    """Add P0 cluster columns to existing SQLite DBs."""
+    from sqlalchemy import inspect, text
+
+    insp = inspect(engine)
+    if "findings" not in insp.get_table_names():
+        return
+    existing = {c["name"] for c in insp.get_columns("findings")}
+    alters = [
+        ("cluster_id", "VARCHAR(32)"),
+        ("cluster_size", "INTEGER DEFAULT 1"),
+        ("related_probe_ids_json", "TEXT DEFAULT '[]'"),
+        ("root_cause", "VARCHAR(64)"),
+        ("confidence", "REAL"),
+    ]
+    with engine.connect() as conn:
+        for col, typedef in alters:
+            if col not in existing:
+                conn.execute(text(f"ALTER TABLE findings ADD COLUMN {col} {typedef}"))
+        conn.commit()

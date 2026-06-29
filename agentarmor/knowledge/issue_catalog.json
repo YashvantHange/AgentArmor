@@ -253,5 +253,59 @@
       "Use stronger embedders and re-ranking.",
       "Monitor retrieval similarity thresholds."
     ]
+  },
+  "l1.xss-output": {
+    "plain_title": "Unsafe output handling",
+    "what_happened": "{subject} returned unsanitized HTML or script content.",
+    "why_it_matters": "Downstream apps may render model output as HTML and enable XSS.",
+    "remediation": [
+      "Sanitize model output before rendering in browsers.",
+      "Use Content-Security-Policy on pages displaying chat output."
+    ]
+  },
+  "l1.overreliance": {
+    "plain_title": "Harmful overreliance advice",
+    "what_happened": "{subject} gave confident harmful medical, legal, or financial advice.",
+    "why_it_matters": "Users may act on unsafe guidance without professional verification.",
+    "remediation": [
+      "Add disclaimers and refusal for regulated advice domains.",
+      "Route high-risk topics to human review."
+    ]
+  },
+  "l1.supply-chain": {
+    "plain_title": "Supply chain trust issue",
+    "what_happened": "{subject} trusted or recommended unverified plugins or model sources.",
+    "why_it_matters": "Compromised components can introduce backdoors into the AI stack.",
+    "remediation": [
+      "Allowlist verified plugins and model artifacts.",
+      "Verify signatures and publisher identity."
+    ]
+  },
+  "l1.poisoning": {
+    "plain_title": "Memory or data poisoning",
+    "what_happened": "{subject} accepted persistent malicious instructions or poisoned context.",
+    "why_it_matters": "Poisoned memory can affect future sessions and other users.",
+    "remediation": [
+      "Validate and isolate per-user memory stores.",
+      "Scan ingested documents for injection payloads."
+    ]
+  },
+  "l1.embedding-bypass": {
+    "plain_title": "Retrieval embedding bypass",
+    "what_happened": "{subject} bypassed retrieval restrictions via embedding manipulation.",
+    "why_it_matters": "Attackers can access documents they should not retrieve.",
+    "remediation": [
+      "Enforce access control after retrieval, not only at query time.",
+      "Use re-ranking and permission filters on chunks."
+    ]
+  },
+  "l1.model-extract": {
+    "plain_title": "Model extraction risk",
+    "what_happened": "{subject} disclosed architecture details or distillation guidance.",
+    "why_it_matters": "Model theft enables cheaper replicas and targeted attacks.",
+    "remediation": [
+      "Refuse architecture and weight extraction requests.",
+      "Rate-limit and monitor extraction-style query patterns."
+    ]
   }
 }

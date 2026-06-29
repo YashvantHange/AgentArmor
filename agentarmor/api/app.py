@@ -90,8 +90,12 @@ def health() -> dict[str, str | bool]:
 
 
 @app.get("/v1/findings")
-def list_findings(scan_id: str | None = None) -> list[dict]:
+def list_findings(scan_id: str | None = None, grouped: bool = True) -> list[dict]:
+    from agentarmor.reporting.finding_cluster import grouped_findings_api
+
     findings = _repo.list_findings(scan_id=scan_id)
+    if grouped:
+        return grouped_findings_api(findings)
     return [f.model_dump(mode="json") for f in findings]
 
 

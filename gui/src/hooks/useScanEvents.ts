@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { eventsUrl } from "../api/client";
+import { loadScanProgress, persistScanProgress } from "./useScanProgress";
 
 export interface ScanEvent {
   event: string;
@@ -8,6 +9,7 @@ export interface ScanEvent {
 
 const NAMED_EVENTS = [
   "scan.started",
+  "scan.phase",
   "scan.heartbeat",
   "discovery.started",
   "discovery.completed",
@@ -15,6 +17,7 @@ const NAMED_EVENTS = [
   "probe.started",
   "probe.waiting",
   "probe.completed",
+  "plan.adapted",
   "scan.completed",
 ];
 
@@ -28,7 +31,12 @@ export function useScanEvents(scanId: string | null) {
   useEffect(() => {
     if (!scanId) return;
 
-    setEvents([]);
+    const cached = loadScanProgress(scanId);
+    if (cached && Array.isArray(cached.events)) {
+      setEvents(cached.events as ScanEvent[]);
+    } else {
+      setEvents([]);
+    }
     setDone(false);
     setError(null);
 
@@ -39,7 +47,11 @@ export function useScanEvents(scanId: string | null) {
       if (SILENT_EVENTS.has(eventName)) return;
       try {
         const data = JSON.parse(raw) as Record<string, unknown>;
-        setEvents((prev) => [...prev, { event: eventName, data }]);
+        setEvents((prev) => {
+          const next = [...prev, { event: eventName, data }];
+          persistScanProgress(scanId, { events: next, savedAt: Date.now() });
+          return next;
+        });
         if (eventName === "scan.completed") {
           setDone(true);
           closed = true;

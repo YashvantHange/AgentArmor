@@ -109,12 +109,19 @@ export function sortFindings(findings: Finding[]): Finding[] {
   });
 }
 
-export function findingExcerpt(finding: Finding): string {
-  if (finding.response_excerpt?.trim()) {
-    return finding.response_excerpt.trim();
-  }
+function findingExcerpt(finding: Finding): string {
   const firstEvidence = finding.evidence?.find((e) => e.trim());
-  if (firstEvidence) return firstEvidence.trim();
+  if (firstEvidence?.trim()) {
+    return firstEvidence.trim();
+  }
+  if (finding.request_summary?.trim()) {
+    const s = finding.request_summary.trim();
+    return s.length > 160 ? `${s.slice(0, 160)}…` : s;
+  }
+  if (finding.response_excerpt?.trim()) {
+    const s = finding.response_excerpt.trim();
+    return s.length > 160 ? `${s.slice(0, 160)}…` : s;
+  }
   return "";
 }
 

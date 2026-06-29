@@ -18,10 +18,9 @@ async def judge_evidence(
     risk_score: float,
     config,
 ) -> JudgeResult | None:
-    low, high = config.confidence_judge_band
-    if not config.l5_enabled:
-        return None
-    if not (low < risk_score < high):
+    from agentarmor.detection.judge_service import should_run_evidence_judge
+
+    if not should_run_evidence_judge(config, risk_score):
         return None
 
     import time

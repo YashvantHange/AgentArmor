@@ -87,6 +87,33 @@ class FusionWeightsConfig(BaseModel):
     l4: float = 0.4
 
 
+class ConfidenceFusionConfig(BaseModel):
+    rules: float = 0.2
+    pipeline: float = 0.3
+    judge: float = 0.3
+    meta: float = 0.2
+
+
+class ProbeThresholdEntry(BaseModel):
+    fail_threshold: float = 0.70
+    warn_threshold: float = 0.40
+    refusal_escalation: float = 0.45
+
+
+class DetectionExperimentalConfig(BaseModel):
+    echo_aware_l1_l2: bool = True
+    judge_downgrade: bool = True
+    tiered_compliance: bool = True
+    echo_min_span_len: int = 12
+    policy_engine: bool = False
+
+
+class JudgeConfig(BaseModel):
+    """Unified judge: off | uncertain_band | always."""
+
+    mode: str | None = None
+
+
 class AgenticConfig(BaseModel):
     enabled: bool = False
     provider: str = "openai"
@@ -181,9 +208,24 @@ class DetectionConfig(BaseModel):
     model_dir: str = "~/.agentarmor/models"
     l3_similarity_threshold: float = 0.82
     fusion_weights: FusionWeightsConfig = Field(default_factory=FusionWeightsConfig)
+    confidence_fusion: ConfidenceFusionConfig = Field(default_factory=ConfidenceFusionConfig)
+    probe_thresholds: dict[str, ProbeThresholdEntry] = Field(default_factory=dict)
+    meta_xgb_experimental: bool = True
+    meta_calibration_enabled: bool = False
+    detector_plugins_enabled: bool = True
+    max_detector_plugins: int = 3
+    plugin_dirs: list[str] = Field(default_factory=lambda: ["detectors"])
+    trusted_detector_ids: list[str] = Field(default_factory=list)
+    policy_path: str = ""
+    active_learning_enabled: bool = True
+    active_learning_uncertain_low: float = 0.45
+    active_learning_uncertain_high: float = 0.55
+    active_learning_queue_path: str = ""
     warn_threshold: float = 0.4
     fail_threshold: float = 0.7
     fail_on: list[str] = Field(default_factory=lambda: ["HIGH", "CRITICAL"])
+    experimental: DetectionExperimentalConfig = Field(default_factory=DetectionExperimentalConfig)
+    judge: JudgeConfig = Field(default_factory=JudgeConfig)
 
     @field_validator("confidence_judge_band", mode="before")
     @classmethod
@@ -218,6 +260,7 @@ class WebScanConfig(BaseModel):
     llm_discovery_on_miss: bool = False
     max_concurrent_browsers: int = 2
     session_ttl_hours: int = 24
+    partial_fail_min_chars: int = 120
     timeout_s: float = 60.0
     stable_ms: int = 1500
     max_wait_ms: int = 45000
@@ -350,6 +393,21 @@ def _load_detection_config(raw: object) -> DetectionConfig:
     self_play_raw = data.pop("self_play", None)
     if isinstance(self_play_raw, dict):
         data["self_play"] = SelfPlayConfig(**self_play_raw)
+    experimental_raw = data.pop("experimental", None)
+    if isinstance(experimental_raw, dict):
+        data["experimental"] = DetectionExperimentalConfig(**experimental_raw)
+    judge_raw = data.pop("judge", None)
+    if isinstance(judge_raw, dict):
+        data["judge"] = JudgeConfig(**judge_raw)
+    fusion_raw = data.pop("confidence_fusion", None)
+    if isinstance(fusion_raw, dict):
+        data["confidence_fusion"] = ConfidenceFusionConfig(**fusion_raw)
+    probe_thr_raw = data.pop("probe_thresholds", None)
+    if isinstance(probe_thr_raw, dict):
+        data["probe_thresholds"] = {
+            k: ProbeThresholdEntry(**v) if isinstance(v, dict) else v
+            for k, v in probe_thr_raw.items()
+        }
     return DetectionConfig(**data)
 
 

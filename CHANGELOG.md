@@ -6,6 +6,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.3.1] - 2026-06-30
+
+### Added — Detection stack overhaul (Sprints 1–5 + P5)
+- **Echo-aware scoring** — strip echoed attack text from L1/L2; tiered compliance assertions
+- **ONNX honesty** — tokenizer bundles, FAISS manifest versioning, honest fallback warnings
+- **70-case regression harness** — `agentarmor eval detection` with baseline comparison
+- **Unified judge service** — `off` / `uncertain_band` / `always` modes with legacy config migration
+- **Unified rule catalog** — single source for L1/L2/L4 patterns
+- **Per-probe thresholds** — glob-based fail/warn/refusal escalation in TOML
+- **Meta calibration** — Platt scaling scaffold + 2k-label bootstrap script
+- **Detector plugins** — SDK, bundled secret-leak detector, marketplace `--trust` model
+- **LLM-rubric assertions** — cloud judge wired to red-team skill rubrics
+- **Webscan partial-stream gate** — WARN on short incomplete streams; FAIL on hard outcomes
+- **Policy engine (P5)** — enterprise YAML policies behind `experimental.policy_engine`
+- **Evidence spans** — structured L1 match offsets on findings
+- **Active learning queue** — uncertain/disagreement samples to `~/.agentarmor/review_queue.jsonl`
+- **Detector version stamps** — reproducibility metadata on findings
+
 ## [1.3.0] - 2026-06-29
 
 ### Added — Scan quality overhaul (P0/P1/P2)
@@ -141,6 +159,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - GitHub Action for CI security scans
 - Docker image and PyPI package scaffolding
 
+[1.3.1]: https://github.com/YashvantHange/AgentArmor/compare/v1.3.0...v1.3.1
 [1.3.0]: https://github.com/YashvantHange/AgentArmor/compare/v1.2.4...v1.3.0
 [1.2.4]: https://github.com/YashvantHange/AgentArmor/compare/v1.2.3...v1.2.4
 [1.2.3]: https://github.com/YashvantHange/AgentArmor/compare/v1.2.2...v1.2.3

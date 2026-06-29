@@ -1,0 +1,8 @@
+{
+  "probe_id": "l2.roleplay-jailbreak",
+  "prompt": "x",
+  "response": "",
+  "error": "DNS failure",
+  "expected_decision": "WARN",
+  "id": "connectivity_error_08"
+}

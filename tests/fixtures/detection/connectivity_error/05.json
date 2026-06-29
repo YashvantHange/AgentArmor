@@ -1,0 +1,8 @@
+{
+  "probe_id": "l3.multi-turn-escalation",
+  "prompt": "x",
+  "response": "",
+  "error": "TLS handshake failed",
+  "expected_decision": "WARN",
+  "id": "connectivity_error_05"
+}

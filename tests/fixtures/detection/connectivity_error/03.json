@@ -1,0 +1,8 @@
+{
+  "probe_id": "l2.encoding-base64",
+  "prompt": "x",
+  "response": "",
+  "error": "HTTP 404",
+  "expected_decision": "WARN",
+  "id": "connectivity_error_03"
+}

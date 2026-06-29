@@ -16,6 +16,8 @@ class Embedder(Protocol):
 class HashEmbedder:
     """Deterministic 384-dim embedding without external models."""
 
+    EMBEDDER_VERSION = "hash-v1"
+
     def __init__(self, dim: int = 384) -> None:
         self.dim = dim
 
@@ -36,11 +38,18 @@ class HashEmbedder:
 def get_embedder(model_dir=None) -> Embedder:
     from agentarmor.detection.l3_semantic.onnx_embedder import BGEOnnxEmbedder
     from agentarmor.detection.models.manager import get_model_manager
+    from agentarmor.detection.models.tokenizer_utils import (
+        has_tokenizer_bundle,
+        warn_missing_tokenizer,
+    )
 
     manager = get_model_manager(model_dir)
     if manager.has_onnx_embedder():
-        try:
-            return BGEOnnxEmbedder(manager.path("bge_onnx"))
-        except Exception:
-            pass
+        if not has_tokenizer_bundle(manager.model_dir, "bge_onnx"):
+            warn_missing_tokenizer("bge_onnx")
+        else:
+            try:
+                return BGEOnnxEmbedder(manager.path("bge_onnx"), manager.model_dir)
+            except Exception:
+                pass
     return HashEmbedder()

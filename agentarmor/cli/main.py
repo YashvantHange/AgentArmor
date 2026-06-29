@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 from pathlib import Path
 from typing import Optional
 
@@ -25,6 +26,47 @@ app.add_typer(benchmark_app, name="benchmark")
 app.add_typer(marketplace_app, name="marketplace")
 app.add_typer(monitor_app, name="monitor")
 app.add_typer(dataset_app, name="dataset")
+
+eval_app = typer.Typer(help="Detection evaluation")
+app.add_typer(eval_app, name="eval")
+
+
+@eval_app.command("detection")
+def eval_detection(
+    fixture: Path = typer.Option(
+        Path("tests/fixtures/detection"),
+        "--fixture",
+        help="Fixture directory",
+    ),
+    compare: Optional[Path] = typer.Option(
+        None, "--compare", help="Baseline JSON for delta comparison"
+    ),
+    output: Optional[Path] = typer.Option(None, "--output", "-o", help="Write report JSON"),
+    config: Optional[Path] = typer.Option(Path("AgentArmor.toml"), "--config", "-c"),
+    ablation: Optional[str] = typer.Option(
+        None, "--ablation", help="Comma-separated layers to disable (l1,l2,l3,l4,meta)"
+    ),
+) -> None:
+    """Evaluate detection accuracy against fixture catalog."""
+    from agentarmor.detection.eval import (
+        compare_baseline,
+        evaluate_detection_fixtures,
+        load_calibration_ece,
+    )
+
+    cfg = load_config(config if config.exists() else None)
+    ablation_layers = [x.strip() for x in ablation.split(",")] if ablation else None
+    report = evaluate_detection_fixtures(fixture, cfg.detection, ablation=ablation_layers)
+    report.calibration_ece = load_calibration_ece(cfg.detection.model_dir)
+    payload = report.to_dict()
+    if compare:
+        payload["comparison"] = compare_baseline(report, compare)
+    text = json.dumps(payload, indent=2)
+    if output:
+        output.write_text(text, encoding="utf-8")
+        typer.echo(f"Wrote {output}")
+    else:
+        typer.echo(text)
 
 
 @app.command()
@@ -196,7 +238,7 @@ def models_download(
     config: Optional[Path] = typer.Option(Path("AgentArmor.toml"), "--config", "-c"),
     force: bool = typer.Option(False, "--force", help="Re-download existing models"),
 ) -> None:
-    """Download ONNX models to the local cache."""
+    """Download ONNX models and tokenizer bundles to the local cache."""
     from agentarmor.detection.models.manager import get_model_manager
 
     cfg = load_config(config if config.exists() else None)

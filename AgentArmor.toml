@@ -15,7 +15,7 @@ l2_enabled = true
 l3_enabled = true
 l4_enabled = true
 meta_enabled = true
-l5_enabled = false
+l5_enabled = false  # deprecated: use [detection.judge] mode
 confidence_judge_band = [0.4, 0.6]
 model_dir = "~/.agentarmor/models"
 l3_similarity_threshold = 0.82
@@ -23,6 +23,29 @@ fusion_weights = { l1 = 0.6, l4 = 0.4 }
 warn_threshold = 0.4
 fail_threshold = 0.7
 fail_on = ["HIGH", "CRITICAL"]
+
+[detection.judge]
+# mode = "off" | "uncertain_band" | "always"
+
+[detection.probe_thresholds]
+# Per-probe glob overrides (defaults built-in for l1.*, l2.*, etc.)
+# "l1.*" = { fail_threshold = 0.65, warn_threshold = 0.35, refusal_escalation = 0.55 }
+
+[detection.confidence_fusion]
+rules = 0.2
+pipeline = 0.3
+judge = 0.3
+meta = 0.2
+
+meta_xgb_experimental = true  # use linear meta until 2k+ human labels
+meta_calibration_enabled = false  # enable after human-label validation (ECE < 0.1)
+
+[detection.experimental]
+echo_aware_l1_l2 = true
+judge_downgrade = true
+tiered_compliance = true
+echo_min_span_len = 12
+# policy_engine = false  # P5.1 enterprise policy overrides
 
 [reporting]
 formats = ["json", "sarif"]
@@ -41,6 +64,8 @@ stable_ms = 1500
 max_wait_ms = 45000
 allowlist = []
 blocklist = []
+
+partial_fail_min_chars = 120
 
 [webscan.risk_weights]
 per_tool = 0.5

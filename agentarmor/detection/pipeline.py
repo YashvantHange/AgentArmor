@@ -18,7 +18,8 @@ from agentarmor.core.models import (
     ProbeResult,
     Severity,
 )
-from agentarmor.detection.l1_signatures import scan as l1_scan
+from agentarmor.detection.rules.catalog import RULE_CATALOG_VERSION
+from agentarmor.detection.l1_signatures import scan_with_echo_filter
 from agentarmor.detection.l2_classifier.onnx_runner import classify as l2_classify
 from agentarmor.detection.l3_semantic.faiss_index import search as l3_search
 from agentarmor.detection.l4_structural import analyze as l4_analyze
@@ -64,7 +65,9 @@ async def analyze_probe_result_async(
             cfg,
         )
     result = _analyze_local(probe.response.content or "", prompt_text, probe.probe_id, cfg)
-    if cfg.l5_enabled:
+    from agentarmor.detection.judge_service import judge_pipeline_evidence, resolve_judge_mode
+
+    if resolve_judge_mode(cfg) == "uncertain_band":
         result = await _maybe_judge(result, probe.response.content or "", prompt_text, cfg)
     return result
 
@@ -107,25 +110,88 @@ def _analyze_local(
     probe_id: str,
     cfg: DetectionConfig,
 ) -> DetectionResult:
+    import time
+
     get_model_manager(cfg.model_dir).ensure_bootstrap_models()
 
-    l1 = l1_scan(text) if cfg.l1_enabled else _empty_l1()
-    l2 = l2_classify(text, cfg.model_dir) if cfg.l2_enabled else _empty_l2()
+    echo_strip_ms = 0.0
+    scoring_text = text
+    echo_layers: dict = {"enabled": False}
+
+    if cfg.experimental.echo_aware_l1_l2 and prompt_text:
+        from agentarmor.detection.l4_structural.echo import (
+            find_echo_spans,
+            should_strip_echo_for_scoring,
+            strip_echo_spans,
+        )
+
+        t0 = time.perf_counter()
+        spans = find_echo_spans(
+            prompt_text, text, min_len=cfg.experimental.echo_min_span_len
+        )
+        scoring_text = (
+            strip_echo_spans(text, spans)
+            if should_strip_echo_for_scoring(prompt_text, spans)
+            else text
+        )
+        echo_strip_ms = (time.perf_counter() - t0) * 1000
+        echo_layers = {
+            "enabled": True,
+            "span_count": len(spans),
+            "latency_ms": echo_strip_ms,
+            "strip_applied": scoring_text != text,
+            "spans": [{"start": s.start, "end": s.end} for s in spans],
+        }
+    else:
+        spans = []
+
+    l1 = (
+        scan_with_echo_filter(text, spans if spans else None)
+        if cfg.l1_enabled
+        else _empty_l1()
+    )
+    l2 = l2_classify(scoring_text, cfg.model_dir) if cfg.l2_enabled else _empty_l2()
     l3 = (
-        l3_search(text, cfg.model_dir, cfg.l3_similarity_threshold)
+        l3_search(scoring_text, cfg.model_dir, cfg.l3_similarity_threshold)
         if cfg.l3_enabled
         else _empty_l3()
     )
     l4 = (
-        l4_analyze(text, prompt=prompt_text, probe_id=probe_id)
+        l4_analyze(
+            text,
+            prompt=prompt_text,
+            probe_id=probe_id,
+            tiered_compliance=cfg.experimental.tiered_compliance,
+        )
         if cfg.l4_enabled
         else _empty_l4()
     )
 
     if cfg.mode == "hybrid" and cfg.api_url:
-        l2, l3 = _hybrid_fetch_l2_l3(text, cfg, l2, l3)
+        l2, l3, hybrid_meta = _hybrid_fetch_l2_l3(scoring_text, cfg, l2, l3)
+        if hybrid_meta:
+            echo_layers = {**echo_layers, "hybrid": hybrid_meta}
 
-    meta = score_meta(l1, l2, l3, l4, cfg)
+    meta = score_meta(l1, l2, l3, l4, cfg, probe_id=probe_id)
+
+    from agentarmor.detection.detectors.registry import run_detector_plugins
+
+    plugin_layers, plugin_risk = run_detector_plugins(
+        text,
+        context={"probe_id": probe_id, "prompt": prompt_text},
+        config=cfg,
+    )
+    if plugin_risk > 0:
+        from agentarmor.detection.probe_thresholds import resolve_probe_thresholds
+
+        thr = resolve_probe_thresholds(probe_id, cfg)
+        meta.risk_score = min(1.0, meta.risk_score + plugin_risk)
+        if meta.risk_score >= thr.fail_threshold:
+            meta.decision = Decision.FAIL
+            meta.severity = Severity.HIGH
+        elif meta.risk_score >= thr.warn_threshold and meta.decision == Decision.PASS:
+            meta.decision = Decision.WARN
+            meta.severity = Severity.MEDIUM
 
     evidence: list[str] = []
     if l1.matches:
@@ -145,6 +211,8 @@ def _analyze_local(
     )
 
     layers = {
+        "echo_strip": echo_layers,
+        "rule_catalog": RULE_CATALOG_VERSION,
         "l1": _layer_dict(l1),
         "l2": {"scores": l2.scores, "max_score": l2.max_score, "top_class": l2.top_class, "engine": l2.engine, "latency_ms": l2.latency_ms},
         "l3": {"score": l3.score, "matches": l3.matches, "engine": l3.engine, "latency_ms": l3.latency_ms},
@@ -156,6 +224,19 @@ def _analyze_local(
             "latency_ms": meta.latency_ms,
         },
     }
+    if plugin_layers:
+        layers["plugins"] = plugin_layers
+        evidence.extend(
+            f"plugin {p['detector_id']}: {p.get('evidence', '')[:80]}"
+            for p in plugin_layers
+            if p.get("evidence")
+        )
+
+    from agentarmor.detection.evidence.spans import collect_evidence_spans
+
+    all_spans = collect_evidence_spans(layers)
+    if all_spans:
+        layers["evidence_spans"] = all_spans
 
     return DetectionResult(
         risk_score=meta.risk_score,
@@ -168,6 +249,10 @@ def _analyze_local(
 
 
 def _hybrid_fetch_l2_l3(text, cfg, local_l2, local_l3):
+    import logging
+
+    logger = logging.getLogger(__name__)
+    meta: dict = {"fallback": False, "l2_from_api": False, "l3_from_api": False}
     try:
         import httpx
 
@@ -185,6 +270,7 @@ def _hybrid_fetch_l2_l3(text, cfg, local_l2, local_l3):
                     top_class=d2.get("top_class", "prompt_injection"),
                     engine="api",
                 )
+                meta["l2_from_api"] = True
             if r3.status_code == 200:
                 d3 = r3.json()
                 from agentarmor.detection.l3_semantic.faiss_index import L3Result
@@ -194,9 +280,12 @@ def _hybrid_fetch_l2_l3(text, cfg, local_l2, local_l3):
                     matches=d3.get("matches", []),
                     engine="api",
                 )
-    except Exception:
-        pass
-    return local_l2, local_l3
+                meta["l3_from_api"] = True
+    except Exception as exc:
+        meta["fallback"] = True
+        meta["error"] = str(exc)
+        logger.warning("hybrid L2/L3 API fetch failed, using local fallback: %s", exc)
+    return local_l2, local_l3, meta
 
 
 async def _analyze_api_mode(text: str, prompt: str, probe_id: str, cfg: DetectionConfig) -> DetectionResult:
@@ -242,6 +331,7 @@ def _layer_dict(l1) -> dict:
         "categories": l1.categories,
         "engine": l1.engine,
         "latency_ms": l1.latency_ms,
+        "evidence_spans": list(getattr(l1, "evidence_spans", None) or []),
     }
 
 

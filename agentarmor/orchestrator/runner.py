@@ -11,7 +11,7 @@ from agentarmor.core.config import AppConfig
 from agentarmor.core.events import event_bus
 from agentarmor.core.models import Decision, Finding, ProbeRequest, ProbeResponse, ProbeResult, Scan, ScanStatus, Severity
 from agentarmor.db.session import ScanRepository
-from agentarmor.detection.agentic.judge import apply_judge_to_detection, judge_probe
+from agentarmor.detection.judge_service import apply_verdict_to_detection, judge_probe_verdict
 from agentarmor.detection.assertions import composite_vuln_score, run_assertions
 from agentarmor.detection.pipeline import analyze_probe_result_async
 from agentarmor.attack.discovery import (
@@ -499,19 +499,56 @@ class ScanRunner:
 
         response_text = result.response.content or ""
         detection = await analyze_probe_result_async(
-            result, prompt_text=prompt_text, config=self._config.detection
+            result,
+            prompt_text=prompt_text,
+            config=self._config.detection.model_copy(
+                update={
+                    "plugin_dirs": list(
+                        dict.fromkeys(
+                            [
+                                *(self._config.detection.plugin_dirs or []),
+                                *self._config.plugin_dirs,
+                            ]
+                        )
+                    )
+                }
+            ),
         )
 
-        assertions = run_assertions(
-            probe_id=probe.id, prompt=prompt_text, response=response_text
+        l1_score = float(detection.layers.get("l1", {}).get("score", 0))
+        l4_outcomes = float(
+            (detection.layers.get("l4", {}) or {}).get("components", {}).get("outcomes", 0)
         )
+        from agentarmor.detection.probe_thresholds import resolve_probe_thresholds
+
+        probe_thr = resolve_probe_thresholds(probe.id, self._config.detection)
+        assertions = run_assertions(
+            probe_id=probe.id,
+            prompt=prompt_text,
+            response=response_text,
+            tiered_compliance=self._config.detection.experimental.tiered_compliance,
+            l1_score=l1_score,
+            l4_outcome_score=l4_outcomes,
+            refusal_escalation=probe_thr.refusal_escalation,
+        )
+        from agentarmor.detection.assertions.rubric import evaluate_llm_rubric_assertion
+
+        rubric_assertion = await evaluate_llm_rubric_assertion(
+            probe_id=probe.id,
+            probe_name=probe.name,
+            prompt=prompt_text,
+            response=response_text,
+            config=self._config,
+        )
+        if rubric_assertion:
+            assertions.append(rubric_assertion)
         assertion_score = composite_vuln_score(assertions)
-        if assertion_score >= self._config.detection.fail_threshold:
+        if assertion_score >= probe_thr.fail_threshold:
             detection.decision = Decision.FAIL
             detection.risk_score = max(detection.risk_score, assertion_score)
             detection.severity = Severity.HIGH
             detection.evidence.append(f"assertion vuln score {assertion_score:.2f}")
-        elif assertion_score >= self._config.detection.warn_threshold:
+        elif assertion_score >= probe_thr.warn_threshold:
             if detection.decision == Decision.PASS:
                 detection.decision = Decision.WARN
             detection.risk_score = max(detection.risk_score, assertion_score)
@@ -529,7 +566,7 @@ class ScanRunner:
             ],
         }
 
-        judge = await judge_probe(
+        judge = await judge_probe_verdict(
             probe_id=probe.id,
             probe_name=probe.name,
             attack_prompt=prompt_text,
@@ -537,12 +574,17 @@ class ScanRunner:
             config=self._config,
         )
         if judge:
-            risk, decision, sev_override = apply_judge_to_detection(
+            risk, decision, sev_override = apply_verdict_to_detection(
                 detection.risk_score,
                 detection.decision,
                 judge,
-                fail_threshold=0.7,
-                warn_threshold=0.5,
+                fail_threshold=probe_thr.fail_threshold,
+                warn_threshold=probe_thr.warn_threshold,
+                probe_id=probe.id,
+                prompt=prompt_text,
+                response=response_text,
+                detection=self._config.detection,
+                l1_score=l1_score,
             )
             detection.risk_score = risk
             detection.decision = decision
@@ -550,6 +592,34 @@ class ScanRunner:
                 detection.severity = sev_override
             detection.evidence.append(f"judge: {judge.rationale[:200]}")
             detection.layers["l5_judge"] = judge.model_dump()
+
+        if self._config.detection.experimental.policy_engine:
+            from pathlib import Path
+
+            from agentarmor.detection.policy.engine import apply_detection_policy
+
+            policy_path = (
+                Path(self._config.detection.policy_path).expanduser()
+                if self._config.detection.policy_path
+                else None
+            )
+            detection = apply_detection_policy(
+                detection,
+                probe_id=probe.id,
+                policy_path=policy_path,
+            )
+
+        from agentarmor.detection.active_learning import maybe_queue_review_sample
+
+        maybe_queue_review_sample(
+            probe_id=probe.id,
+            prompt=prompt_text,
+            response=response_text,
+            detection=detection,
+            config=self._config.detection,
+            judge_vulnerable=judge.vulnerable if judge else None,
+            enabled=self._config.detection.active_learning_enabled,
+        )
 
         module_triggered = bool(
             result.metadata.get("triggered") or result.response.raw.get("triggered")
@@ -572,12 +642,25 @@ class ScanRunner:
         risk_assessment = compute_risk_assessment(detection, reproducibility=reproducibility)
 
         judge_conf = float(judge.confidence) if judge else None
+        from agentarmor.detection.l4_structural.injection_outcomes import has_hard_outcome
+
         fusion = fuse_detection_confidence(
             risk_score=detection.risk_score,
             decision_fail=is_finding,
             detection_layers=detection.layers,
             judge_confidence=judge_conf,
+            fusion_weights=self._config.detection.confidence_fusion,
+            has_hard_outcome=has_hard_outcome(probe.id, prompt_text, response_text),
+            judge_confirms_vuln=bool(judge and judge.vulnerable),
         )
+
+        from agentarmor.detection.evidence.spans import collect_evidence_spans
+        from agentarmor.detection.versioning import build_detector_version_stamp
+
+        version_stamp = build_detector_version_stamp(
+            self._config.detection, detection.layers
+        )
+        evidence_spans = collect_evidence_spans(detection.layers)
 
         finding = None
         if is_finding:
@@ -611,6 +694,8 @@ class ScanRunner:
             )
             finding.metadata["detection_confidence"] = fusion["fused_confidence"]
             finding.metadata["confidence_fusion"] = fusion
+            finding.metadata["detector_versions"] = version_stamp
+            finding.metadata["evidence_spans"] = evidence_spans
             enrichment = await enrich_finding(finding, result, self._config)
             finding.metadata["enrichment"] = enrichment.model_dump()
             if enrichment.plain_title:

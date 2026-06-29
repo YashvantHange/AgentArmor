@@ -30,6 +30,9 @@ try {
     }
     npm install
     npm run tauri build
+    if ($LASTEXITCODE -ne 0) {
+        throw "Tauri build failed with exit code $LASTEXITCODE"
+    }
     Write-Host "Installer artifacts in gui/src-tauri/target/release/bundle/"
 } finally {
     Pop-Location

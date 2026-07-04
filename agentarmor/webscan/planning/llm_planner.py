@@ -7,6 +7,7 @@ import re
 from typing import Any
 
 from agentarmor.core.config import AppConfig
+from agentarmor.core.metering import UsageMeter, record_completion_usage
 from agentarmor.webscan.models import AgentRiskProfile, CapabilityMap, WebProbeDef
 from agentarmor.webscan.planning.prompts import ATTACK_PLANNER_SYSTEM
 
@@ -57,6 +58,7 @@ async def generate_llm_probes(
     config: AppConfig,
     *,
     max_probes: int = 8,
+    meter: UsageMeter | None = None,
 ) -> list[WebProbeDef]:
     """Generate custom probes via cloud LLM; returns empty list when cloud is unavailable."""
     agentic = config.detection.agentic
@@ -103,6 +105,7 @@ async def generate_llm_probes(
             max_tokens=1200,
         )
         content = (completion.choices[0].message.content or "").strip()
+        record_completion_usage(meter, completion, agentic.model)
     except Exception:
         return []
 

@@ -17,6 +17,7 @@ from agentarmor.detection.l5_judge.judge import judge_evidence as _judge_evidenc
 
 if TYPE_CHECKING:
     from agentarmor.core.config import AppConfig, DetectionConfig
+    from agentarmor.core.metering import UsageMeter
 
 _LEGACY_WARNED = False
 
@@ -69,6 +70,7 @@ async def judge_probe_verdict(
     response: str,
     config: AppConfig,
     rubric: str | None = None,
+    meter: "UsageMeter | None" = None,
 ) -> VerdictJudgeResult | None:
     if not should_run_verdict_judge(config.detection):
         return None
@@ -79,6 +81,7 @@ async def judge_probe_verdict(
         response=response,
         config=config,
         rubric=rubric,
+        meter=meter,
     )
 
 

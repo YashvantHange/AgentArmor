@@ -8,6 +8,7 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 from agentarmor.core.config import AppConfig
+from agentarmor.core.metering import UsageMeter, record_completion_usage
 from agentarmor.detection.agentic.guardrails import evidence_in_response
 from agentarmor.detection.agentic.prompts import JUDGE_SYSTEM
 
@@ -28,6 +29,7 @@ async def run_verdict_judge(
     response: str,
     config: AppConfig,
     rubric: str | None = None,
+    meter: UsageMeter | None = None,
 ) -> JudgeResult | None:
     agentic = config.detection.agentic
     api_key = agentic.api_key or ""
@@ -68,6 +70,7 @@ async def run_verdict_judge(
             max_tokens=600,
         )
         content = (completion.choices[0].message.content or "").strip()
+        record_completion_usage(meter, completion, agentic.model)
         trace["latency_ms"] = round((time.perf_counter() - start) * 1000, 1)
         parsed = _parse_judge_json(content)
         if not parsed:

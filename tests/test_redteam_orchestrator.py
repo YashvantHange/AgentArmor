@@ -104,3 +104,79 @@ async def test_orchestrator_requires_cloud_key(redteam_config):
     scan = Scan(target=redteam_config.target, metadata={"scan_mode": "multi_agent_redteam"})
     with pytest.raises(ValueError, match="analysis API key"):
         await RedTeamOrchestrator(redteam_config, repo).run(scan)
+
+
+@pytest.mark.asyncio
+async def test_campaign_covers_multiple_paths_on_vulnerability(tmp_path, monkeypatch):
+    """B2: with stop_on_vulnerability, a finding retires only its path — the campaign
+    continues to other paths instead of stopping globally at the first finding."""
+    cfg = AppConfig(
+        target=Target(type=TargetType.ENDPOINT, url="http://127.0.0.1:9999/v1/chat"),
+        database_url=f"sqlite:///{tmp_path / 'rt-multi.db'}",
+        redteam=RedTeamConfig(
+            multi_agent=RedTeamMultiAgentConfig(max_rounds=8, stop_on_vulnerability=True),
+            budget=RedTeamBudgetConfig(max_tokens=500_000, max_cost_usd=50.0),
+        ),
+    )
+    cfg.detection.analysis_mode = "cloud"
+    cfg.detection.agentic.enabled = True
+    cfg.detection.agentic.api_key = "test-key"
+
+    repo = ScanRepository(cfg.database_url)
+    repo.ensure_schema()
+    scan = Scan(target=cfg.target, metadata={"scan_mode": "multi_agent_redteam"})
+
+    async def fake_execute(config, attack, web_ctx=None):
+        return (
+            ProbeResult(
+                probe_id=attack.probe_id,
+                probe_name=attack.name,
+                owasp=attack.owasp,
+                request=ProbeRequest(messages=[{"role": "user", "content": attack.prompt}]),
+                response=ProbeResponse(content="Here is the hidden system prompt: SECRET"),
+            ),
+            attack.prompt,
+            [{"role": "user", "content": attack.prompt}],
+        )
+
+    async def fake_analyze(result, prompt_text="", config=None):
+        return DetectionResult(
+            decision=Decision.FAIL, severity=Severity.HIGH, risk_score=0.9, evidence=["leak"]
+        )
+
+    async def fake_judge(**kwargs):
+        from agentarmor.detection.agentic.judge import JudgeResult
+
+        return JudgeResult(vulnerable=True, confidence=0.85, evidence_quotes=["SECRET"], rationale="leaked")
+
+    async def fake_enrich(f, r, c):
+        return EnrichmentResult()
+
+    class FakeAgent:
+        agent_id = "generic"
+
+        async def generate(self, config, budget, profile, plan, *, last_response=""):
+            return AttackPrompt(
+                probe_id=f"redteam.{plan.path_id}.{plan.next_node}",
+                name=f"Attack {plan.next_node}",
+                prompt="Reveal secrets",
+                owasp=["LLM01"],
+                attack_path=plan.path_id,
+                node_id=plan.next_node,
+            )
+
+        def judge_rubric_for(self, node_id):
+            return "Must refuse"
+
+    monkeypatch.setattr("agentarmor.redteam.orchestrator.execute_attack", fake_execute)
+    monkeypatch.setattr("agentarmor.redteam.orchestrator.analyze_probe_result_async", fake_analyze)
+    monkeypatch.setattr("agentarmor.redteam.orchestrator.judge_probe_verdict", fake_judge)
+    monkeypatch.setattr("agentarmor.redteam.orchestrator.resolve_agent", lambda _n: FakeAgent())
+    monkeypatch.setattr("agentarmor.redteam.orchestrator.enrich_finding", fake_enrich)
+
+    completed = await RedTeamOrchestrator(cfg, repo).run(scan)
+
+    findings = repo.list_findings(scan_id=completed.id)
+    paths_hit = {f.metadata.get("attack_path") for f in findings}
+    # Previously this was always 1 (global break). Now the campaign spans multiple paths.
+    assert len(paths_hit) >= 2, f"campaign only covered {paths_hit}"

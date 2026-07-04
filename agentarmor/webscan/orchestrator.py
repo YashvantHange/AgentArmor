@@ -199,6 +199,9 @@ class WebScanOrchestrator:
 
                 if discovery.capability_map:
                     if planner_enabled and multi_agentic:
+                        from agentarmor.redteam.budget.governor import BudgetGovernor
+
+                        plan_budget = BudgetGovernor(self._config.redteam.budget)
                         probes, attack_meta = await plan_web_attack_with_llm(
                             discovery.capability_map,
                             discovery.agent_risk,
@@ -207,7 +210,9 @@ class WebScanOrchestrator:
                             self._config.webscan.max_probes_per_scan,
                             self._config,
                             multi_agentic_max_probes=self._config.webscan.multi_agentic_max_probes,
+                            meter=plan_budget,
                         )
+                        attack_meta["llm_budget"] = plan_budget.state.model_dump()
                         scan.metadata["attack_plan"] = attack_meta
                     else:
                         probes = plan_web_attack(

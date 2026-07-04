@@ -41,3 +41,20 @@ models/*.safetensors
 .idea/
 .vscode/
 *.db-journal
+
+# Local detection model artifacts generated into tests/ or the working dir
+tests/meta.ubj
+tests/meta.json
+tests/exploit.faiss
+tests/exploit_phrases.json
+tests/manifest.json
+tests/calibration.json
+
+# Meta-calibration bootstrap data (large, generated)
+docs/meta_seed_labels.jsonl
+
+# Local webscan DOM-inspection scratch (dev-only tools + captured DOM dumps)
+scripts/inspect_*.py
+scripts/test_gandalf_probe.py
+scripts/*_dom.json
+scripts/gandalf_body.txt

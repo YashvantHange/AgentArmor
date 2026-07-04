@@ -16,7 +16,7 @@ export function ScanDepthPicker({ value, onChange, multiAgenticRequiresCloud = t
       <div>
         <h3 className="text-sm font-medium text-ink-primary">Scan depth</h3>
         <p className="mt-1 text-sm text-ink-muted">
-          Standard runs offline probes. Multi-agentic adds cloud LLM discovery, judge, and expanded attack planning.
+          Standard runs the core probe set. Multi-agentic adds LLM discovery, the red-team planner, and expanded attack-graph coverage.
         </p>
       </div>
       <div className="grid gap-2 sm:grid-cols-2">

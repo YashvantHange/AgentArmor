@@ -65,11 +65,12 @@ async def test_llm_classifier_skips_offline():
     assert result is None
 
 
-def test_api_multi_agentic_requires_key():
+def test_api_multi_agentic_requires_key(monkeypatch):
     from fastapi.testclient import TestClient
 
     from agentarmor.api.app import app
 
+    monkeypatch.delenv("AGENTARMOR_ANALYSIS_API_KEY", raising=False)
     client = TestClient(app)
     r = client.post(
         "/v1/web-scans",

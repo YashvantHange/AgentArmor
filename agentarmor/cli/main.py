@@ -13,7 +13,7 @@ import uvicorn
 from agentarmor.cli.gate import gate_main
 from agentarmor.cli.benchmark import benchmark_app
 from agentarmor.cli.ecosystem import dataset_app, marketplace_app, monitor_app
-from agentarmor.core.config import apply_analysis_options, load_config, merge_cli_target
+from agentarmor.core.config import apply_analysis_options, ensure_analysis_ready, load_config, merge_cli_target
 from agentarmor.db.models import init_db
 
 app = typer.Typer(
@@ -131,6 +131,7 @@ def scan(
             analysis_api_key=analysis_api_key,
             auth_token=auth_token,
         )
+        ensure_analysis_ready(cfg)
     except ValueError as exc:
         typer.echo(f"Error: {exc}", err=True)
         raise typer.Exit(1)

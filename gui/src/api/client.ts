@@ -2,7 +2,8 @@ const base = import.meta.env.VITE_API_URL || "http://127.0.0.1:8787";
 
 export type ScanType = "endpoint" | "provider" | "local" | "agent" | "mcp" | "rag";
 
-export type AnalysisMode = "offline" | "cloud";
+// Offline analysis mode was removed in v1.4.0 — cloud multi-agent is the only mode.
+export type AnalysisMode = "cloud";
 
 export interface ScanCreateBody {
   target_type: ScanType;

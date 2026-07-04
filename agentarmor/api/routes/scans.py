@@ -13,7 +13,7 @@ from pydantic import BaseModel, Field
 
 from agentarmor.api.report_files import MEDIA_TYPES, create_zip_archive, resolve_report_path, unlink_path
 
-from agentarmor.core.config import apply_analysis_options, apply_endpoint_options, apply_multi_agent_redteam_options, apply_planner_options, apply_redteam_options, load_config, merge_cli_target
+from agentarmor.core.config import apply_analysis_options, apply_endpoint_options, apply_multi_agent_redteam_options, apply_planner_options, apply_redteam_options, ensure_analysis_ready, load_config, merge_cli_target
 from agentarmor.core.events import event_bus
 from agentarmor.core.models import Scan, ScanStatus
 from agentarmor.db.session import ScanRepository
@@ -43,7 +43,7 @@ class ScanCreateRequest(BaseModel):
     rag: str | None = None
     embedder: str | None = None
     auth_token: str | None = None
-    analysis_mode: str = "offline"
+    analysis_mode: str = "cloud"
     analysis_provider: str | None = None
     analysis_model: str | None = None
     analysis_api_key: str | None = None
@@ -141,12 +141,6 @@ def _build_config(body: ScanCreateRequest):
         max_tokens=body.redteam_max_tokens,
         max_cost_usd=body.redteam_max_cost_usd,
     )
-    if scan_mode == "multi_agent_redteam":
-        if cfg.detection.analysis_mode != "cloud" or not cfg.detection.agentic.api_key:
-            raise HTTPException(
-                400,
-                "multi_agent_redteam requires analysis_mode=cloud with a provider API key.",
-            )
     validate_target(cfg)
     return cfg
 
@@ -172,6 +166,7 @@ async def create_scan(body: ScanCreateRequest, background_tasks: BackgroundTasks
     _repo.ensure_schema()
     try:
         cfg = _build_config(body)
+        ensure_analysis_ready(cfg)
     except ValueError as exc:
         raise HTTPException(400, str(exc)) from exc
     if cfg.features.planner_v2:

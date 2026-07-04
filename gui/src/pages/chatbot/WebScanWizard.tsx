@@ -24,7 +24,7 @@ export default function WebScanWizard() {
   const [discovery, setDiscovery] = useState<WebDiscoverResult | null>(null);
   const [webscanReady, setWebscanReady] = useState<boolean | null>(null);
   const [depth, setDepth] = useState<ScanDepthValue>({ scan_depth: "standard" });
-  const [analysis, setAnalysis] = useState<AnalysisModeValue>({ analysis_mode: "offline" });
+  const [analysis, setAnalysis] = useState<AnalysisModeValue>({ analysis_mode: "cloud" });
   const [authMode, setAuthMode] = useState<AuthMode>("none");
   const [plannerEnabled, setPlannerEnabled] = useState(false);
   const [authScanId, setAuthScanId] = useState<string | null>(null);
@@ -35,7 +35,7 @@ export default function WebScanWizard() {
     api.getWebScanCapabilities().then((c) => setWebscanReady(c.webscan_ready)).catch(() => setWebscanReady(false));
     api.getSettings().then((s) => {
       setAnalysis({
-        analysis_mode: s.analysis_mode || "offline",
+        analysis_mode: "cloud",
         analysis_provider: s.analysis_provider,
         analysis_model: s.analysis_model,
         analysis_api_key: s.analysis_api_key,
@@ -44,13 +44,10 @@ export default function WebScanWizard() {
   }, []);
 
   useEffect(() => {
-    if (depth.scan_depth === "multi_agentic" && analysis.analysis_mode !== "cloud") {
-      setAnalysis((a) => ({ ...a, analysis_mode: "cloud" }));
-    }
     if (depth.scan_depth !== "multi_agentic") {
       setPlannerEnabled(false);
     }
-  }, [depth.scan_depth, analysis.analysis_mode]);
+  }, [depth.scan_depth]);
 
   const multiAgenticBlocked =
     depth.scan_depth === "multi_agentic" &&
@@ -295,7 +292,7 @@ export default function WebScanWizard() {
             <p className="text-sm text-ink-muted">
               {depth.scan_depth === "multi_agentic"
                 ? "Cloud judge validates responses; red team planner runs attack-graph paths for detected capabilities."
-                : "Probes adapt to detected capabilities (RAG, tools, MCP, memory) with offline OWASP analysis."}
+                : "Probes adapt to detected capabilities (RAG, tools, MCP, memory) with multi-agent OWASP analysis."}
             </p>
             {error && <Alert tone="error">{error}</Alert>}
 

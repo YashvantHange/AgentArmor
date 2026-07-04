@@ -12,7 +12,7 @@ from pydantic import BaseModel, Field
 
 from agentarmor.api.report_files import MEDIA_TYPES, create_zip_archive, resolve_report_path, unlink_path
 
-from agentarmor.core.config import apply_analysis_options, load_config
+from agentarmor.core.config import apply_analysis_options, ensure_analysis_ready, load_config
 from agentarmor.core.models import ScanStatus
 from agentarmor.webscan.auth import auth_session_manager, save_storage_state
 from agentarmor.webscan.browser.pool import playwright_available
@@ -82,7 +82,7 @@ class WebScanContinueRequest(BaseModel):
     owasp_filters: list[str] = Field(
         default_factory=lambda: ["LLM01", "LLM02", "LLM05", "LLM06", "LLM07", "LLM08", "LLM09"]
     )
-    analysis_mode: str = "offline"
+    analysis_mode: str = "cloud"
     analysis_provider: str | None = None
     analysis_model: str | None = None
     analysis_api_key: str | None = None
@@ -97,7 +97,7 @@ class WebScanCreateRequest(BaseModel):
     owasp_filters: list[str] = Field(
         default_factory=lambda: ["LLM01", "LLM02", "LLM05", "LLM06", "LLM07", "LLM08", "LLM09"]
     )
-    analysis_mode: str = "offline"
+    analysis_mode: str = "cloud"
     analysis_provider: str | None = None
     analysis_model: str | None = None
     analysis_api_key: str | None = None
@@ -243,6 +243,10 @@ async def continue_auth_session(
 
     cfg = _cfg_with_analysis(body_for_validation)
     try:
+        ensure_analysis_ready(cfg)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    try:
         storage_state = await auth_session_manager.finalize(scan_id)
     except KeyError as exc:
         raise HTTPException(409, "login browser session expired; call prepare-session again") from exc
@@ -287,6 +291,10 @@ async def create_web_scan(body: WebScanCreateRequest, background_tasks: Backgrou
     cfg = load_config(_config_path if _config_path.exists() else None)
     _enforce_rate_limit(cfg)
     body = _validate_multi_agentic(body)
+    try:
+        ensure_analysis_ready(_cfg_with_analysis(body))
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
 
     _repo.ensure_schema()
     scan = build_web_scan(

@@ -179,6 +179,7 @@ class RedTeamOrchestrator:
                 response=response_text,
                 config=cfg,
                 rubric=rubric or None,
+                meter=budget,
             )
             if judge:
                 risk, decision, sev_override = apply_verdict_to_detection(
@@ -264,9 +265,12 @@ class RedTeamOrchestrator:
                 findings.append(finding)
                 self._repo.save_finding(finding)
 
+                # Per-path stop: a finding retires THIS path, but the campaign
+                # continues to the remaining attack paths for broader coverage.
                 if rt.multi_agent.stop_on_vulnerability:
+                    planner.complete_path(plan.path_id)
+                else:
                     planner.advance_node(plan.path_id)
-                    break
 
             if not verdict.vulnerable:
                 planner.advance_node(plan.path_id)

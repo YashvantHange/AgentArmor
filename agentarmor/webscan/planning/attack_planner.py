@@ -2,11 +2,16 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from agentarmor.core.config import AppConfig
 from agentarmor.webscan.models import AgentRiskProfile, CapabilityMap, ScanDepth, WebProbeDef
 from agentarmor.webscan.planning.llm_planner import generate_llm_probes
 from agentarmor.webscan.planning.rules import select_probes_for_capabilities
 from agentarmor.webscan.probes.catalog import get_web_probes
+
+if TYPE_CHECKING:
+    from agentarmor.core.metering import UsageMeter
 
 
 def plan_web_attack(
@@ -79,6 +84,7 @@ async def plan_web_attack_with_llm(
     *,
     multi_agentic_max_probes: int = 45,
     llm_max: int = 8,
+    meter: "UsageMeter | None" = None,
 ) -> tuple[list[WebProbeDef], dict]:
     """Rule-based plan plus optional LLM custom probes (multi-agentic + cloud only)."""
     base = plan_web_attack(
@@ -98,6 +104,7 @@ async def plan_web_attack_with_llm(
         agent_risk,
         config,
         max_probes=llm_max,
+        meter=meter,
     )
     if not llm_probes:
         return base, meta

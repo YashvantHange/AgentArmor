@@ -48,3 +48,11 @@ class PlannerAgent:
 
     def advance_node(self, path_id: str) -> None:
         self._node_index[path_id] = self._node_index.get(path_id, 0) + 1
+
+    def complete_path(self, path_id: str) -> None:
+        """Mark a path fully handled (e.g. a vulnerability was found on it) so the
+        planner skips its remaining nodes and moves on to the next attack path."""
+        for path in self._paths:
+            if path.path_id == path_id:
+                self._node_index[path_id] = len(path.nodes)
+                break

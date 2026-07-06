@@ -1,28 +1,35 @@
-## AgentArmor v1.3.1 — Detection stack overhaul
+## AgentArmor v1.4.0 — Multi-agentic only
 
-Release focused on detection accuracy, reproducibility, and enterprise-ready policy hooks.
+AgentArmor is now a **multi-agent AI red-teaming platform**. The offline analysis mode has
+been removed: every scan runs capability-aware attack-graph planning, an LLM judge, and
+confidence scoring. This release also fixes real correctness bugs in the multi-agentic engine.
 
-### Added
-- **Echo-aware scoring** — L1/L2 echo stripping; tiered compliance assertions (Sprint 1)
-- **ONNX/FAISS hardening** — tokenizer bundles, index versioning, honest fallback (Sprint 2)
-- **Regression harness** — 70 fixtures, `agentarmor eval detection`, baseline JSON (Sprint 2)
-- **Unified judge** — `JudgeService` with legacy config migration (Sprint 3)
-- **Rule catalog** — single YAML source for L1/L2/L4 (Sprint 3)
-- **Per-probe thresholds** + **meta calibration** scaffold (Sprint 4)
-- **Detector plugins** — SDK, marketplace `--trust`, LLM-rubric assertions (Sprint 5)
-- **Webscan partial-stream gate** — completeness-aware WARN/FAIL (Sprint 5)
-- **Policy engine, evidence spans, version stamps, active-learning queue** (P5)
+### Changed
+- **Offline analysis mode removed** — the GUI offline↔cloud picker is gone; the CLI and API
+  run multi-agent (cloud) analysis on every scan.
+- **Analysis API key now required** — scans without a provider key are rejected with a clear
+  error. Set `AGENTARMOR_ANALYSIS_API_KEY`, or configure it in Settings / `AgentArmor.toml`.
+- The local L1–L4/meta detection engine still runs as the under-the-hood scorer; local
+  model-file scanning (`--model`) is unaffected.
 
-### Fixed
-- Meta scorer hard-signal floor for clear L1/L4 hits
-- Webscan partial streams no longer blanket-WARN when hard outcomes are present
+### Fixed (multi-agentic engine)
+- **Module targets now receive the real attack** — red-team attacks against agent/MCP/RAG
+  targets send the generated attack (harness prompt, RAG query, MCP tool-parameter injection)
+  instead of running a static probe and relabelling the display text.
+- **Budget metering** — the LLM judge and web attack planner now record token/cost usage
+  against the budget governor instead of bypassing it.
+
+### Added (multi-agentic engine)
+- **Per-path campaign coverage** — a finding now retires only its attack path and the campaign
+  continues across the remaining paths, instead of stopping at the first finding.
 
 ---
 
 ## Windows (recommended)
 
-Download **AgentArmor_1.3.1_x64-setup.exe** or **AgentArmor_1.3.1_x64_en-US.msi** from the assets below.
+Download **AgentArmor_1.4.0_x64-setup.exe** or **AgentArmor_1.4.0_x64_en-US.msi** from the assets below.
 
 1. Run the installer
 2. Open **AgentArmor** — no Python install required
-3. Choose a scan profile → run scan → review grouped findings → download reports
+3. Add your analysis provider API key in **Settings**
+4. Choose a scan profile → run scan → review grouped findings → download reports

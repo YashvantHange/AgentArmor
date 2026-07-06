@@ -6,6 +6,36 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Planned — multi-agentic engine (fast-follows)
+- Cross-round memory / fact carry-over so a secret leaked on one node feeds later nodes
+- Critic/ensemble judge (independent second opinion in the uncertain band)
+- Unified finding clustering for the webscan→redteam escalation path
+
+## [1.4.0] - 2026-07-05
+
+### Changed — Multi-agentic only
+- **Offline analysis mode removed.** Every scan now runs the multi-agent (cloud) analysis
+  path — capability-aware attack-graph planning, LLM judge, and confidence scoring. The
+  offline↔cloud picker is gone from the GUI; the CLI and API force cloud analysis.
+- **Analysis API key now required.** Scans started without a provider API key are rejected
+  with a clear error at the CLI, `POST /v1/scans`, and web-scan create/continue endpoints.
+  Set `AGENTARMOR_ANALYSIS_API_KEY` or configure it in Settings / `AgentArmor.toml`.
+- The local L1–L4/meta detection engine is unchanged and still runs as the under-the-hood
+  scorer beneath the multi-agent path. Local model-file scanning (`--model`) is unaffected.
+
+### Fixed — Multi-agentic engine
+- **Module-target execution (B1):** red-team attacks against agent/MCP/RAG module targets now
+  actually send the generated attack (agent harness prompt, RAG query, MCP tool-parameter
+  injection) instead of running a static probe and only relabelling the display text.
+- **Budget metering (B3):** the LLM judge and the web attack planner now record token/cost
+  usage against the `BudgetGovernor` instead of bypassing it.
+
+### Added — Multi-agentic engine
+- **Per-path campaign coverage (B2):** `stop_on_vulnerability` now retires only the path a
+  finding was found on and continues the campaign across the remaining attack paths, instead
+  of ending the whole campaign at the first finding.
+- Provider-neutral `UsageMeter` metering seam (`agentarmor.core.metering`).
+
 ## [1.3.1] - 2026-06-30
 
 ### Added — Detection stack overhaul (Sprints 1–5 + P5)
@@ -159,6 +189,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - GitHub Action for CI security scans
 - Docker image and PyPI package scaffolding
 
+[1.4.0]: https://github.com/YashvantHange/AgentArmor/compare/v1.3.1...v1.4.0
 [1.3.1]: https://github.com/YashvantHange/AgentArmor/compare/v1.3.0...v1.3.1
 [1.3.0]: https://github.com/YashvantHange/AgentArmor/compare/v1.2.4...v1.3.0
 [1.2.4]: https://github.com/YashvantHange/AgentArmor/compare/v1.2.3...v1.2.4

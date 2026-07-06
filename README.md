@@ -4,7 +4,7 @@
 
 AgentArmor runs structured security probes against your AI stack, scores findings with an enterprise risk model (0–100), maps results to **OWASP LLM Top 10**, and exports reports for developers and security teams (SARIF, HTML, PDF, CSV).
 
-**Latest release:** [v1.3.1](https://github.com/YashvantHange/AgentArmor/releases/tag/v1.3.1) · [Changelog](CHANGELOG.md)
+**Latest release:** [v1.4.0](https://github.com/YashvantHange/AgentArmor/releases/tag/v1.4.0) · [Changelog](CHANGELOG.md)
 
 ---
 
@@ -34,7 +34,7 @@ AgentArmor runs structured security probes against your AI stack, scores finding
 
 ### Windows desktop (recommended)
 
-1. Download **`AgentArmor_1.3.1_x64-setup.exe`** or **`.msi`** from [Releases](https://github.com/YashvantHange/AgentArmor/releases/latest)
+1. Download **`AgentArmor_1.4.0_x64-setup.exe`** or **`.msi`** from [Releases](https://github.com/YashvantHange/AgentArmor/releases/latest)
 2. Run the installer
 3. Open **AgentArmor** → choose scan type (API, Local Model, Agent, MCP, RAG, Benchmark)
 4. Configure target → run scan → review findings → export reports
@@ -74,9 +74,10 @@ agentarmor scan --url http://localhost:8000/v1/chat/completions
 export OPENAI_API_KEY=sk-...
 agentarmor scan --provider openai
 
-# With cloud enrichment + self-play red teaming
+# Multi-agent analysis runs on every scan (offline mode was removed in v1.4.0).
+# Provide an analysis API key via AGENTARMOR_ANALYSIS_API_KEY or --analysis-api-key.
+export AGENTARMOR_ANALYSIS_API_KEY=sk-...
 agentarmor scan --url https://api.example.com/v1/chat/completions \
-  --analysis-mode cloud \
   --self-play-enabled
 ```
 
@@ -142,7 +143,7 @@ The Tauri v2 GUI includes:
 | Screen | Purpose |
 |--------|---------|
 | **Home** | Scan type picker + benchmark shortcut |
-| **Chatbot wizard** | Guided API scan with offline/cloud analysis |
+| **Chatbot wizard** | Guided API scan with multi-agent analysis |
 | **Scan progress** | Live SSE probe stream |
 | **Findings** | Risk scores, attack chains, evidence graph |
 | **Reports** | Export HTML, SARIF, PDF, CSV, JSON |
@@ -216,7 +217,7 @@ See [action/action.yml](action/action.yml).
 | Azure | `AZURE_API_KEY`, `AZURE_API_BASE` |
 | Bedrock | `AWS_*` credentials |
 
-Cloud enrichment and self-play require an API key for the analysis provider (configured in GUI Settings or `AgentArmor.toml`).
+As of **v1.4.0 the offline analysis mode was removed** — AgentArmor runs multi-agent (cloud) analysis on **every** scan: capability-aware attack-graph planning, an LLM judge, and confidence scoring. This requires an analysis provider API key. Set `AGENTARMOR_ANALYSIS_API_KEY` (or a provider key such as `OPENAI_API_KEY`), or configure it in **GUI Settings** / `AgentArmor.toml`. Scans started without a key are rejected with a clear error.
 
 ---
 

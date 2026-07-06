@@ -421,8 +421,10 @@ def apply_analysis_options(
     auth_token: str | None = None,
 ) -> AppConfig:
     if analysis_mode:
-        config.detection.analysis_mode = analysis_mode
-        config.detection.agentic.enabled = analysis_mode == "cloud"
+        # Offline analysis mode is no longer supported — every scan runs the
+        # multi-agent (cloud) analysis path. Any requested mode resolves to cloud.
+        config.detection.analysis_mode = "cloud"
+        config.detection.agentic.enabled = True
     if analysis_provider:
         config.detection.agentic.provider = analysis_provider
     if analysis_model:
@@ -443,6 +445,29 @@ def apply_analysis_options(
     else:
         config.target.headers = _sanitize_target_headers(config.target.headers)
     return config
+
+
+def ensure_analysis_ready(config: AppConfig) -> None:
+    """Enforce that a scan can run multi-agent analysis.
+
+    AgentArmor no longer ships an offline analysis mode: every scan runs the
+    cloud multi-agent path, which needs a provider API key. Resolves the key from
+    the configured env var if not already set, and raises ``ValueError`` when none
+    is available so callers can surface a clear error before starting a scan.
+    """
+    config.detection.analysis_mode = "cloud"
+    config.detection.agentic.enabled = True
+    agentic = config.detection.agentic
+    if not agentic.api_key:
+        env_key = os.environ.get(agentic.api_key_env, "")
+        if env_key:
+            agentic.api_key = env_key
+    if not agentic.api_key:
+        raise ValueError(
+            "An analysis API key is required. AgentArmor runs multi-agent analysis on "
+            f"every scan — set {agentic.api_key_env} in the environment, configure it in "
+            "Settings, or pass --analysis-api-key."
+        )
 
 
 def apply_endpoint_options(

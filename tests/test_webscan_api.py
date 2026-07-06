@@ -41,7 +41,8 @@ def test_create_rejects_manual_session_without_prepare():
     assert "prepare-session" in r.json()["detail"]
 
 
-def test_create_rejects_multi_agentic_without_key():
+def test_create_rejects_multi_agentic_without_key(monkeypatch):
+    monkeypatch.delenv("AGENTARMOR_ANALYSIS_API_KEY", raising=False)
     r = client.post(
         "/v1/web-scans",
         json={"page_url": "https://example.com", "scan_depth": "multi_agentic", "analysis_mode": "cloud"},

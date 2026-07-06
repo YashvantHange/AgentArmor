@@ -43,7 +43,7 @@ interface Props {
   value: RedTeamOptions;
   onChange: (v: RedTeamOptions) => void;
   scanType?: ScanType;
-  analysisMode?: "offline" | "cloud";
+  analysisMode?: "cloud";
   compact?: boolean;
 }
 
@@ -51,7 +51,7 @@ export function RedTeamOptionsPicker({
   value,
   onChange,
   scanType,
-  analysisMode = "offline",
+  analysisMode = "cloud",
   compact,
 }: Props) {
   const showSelfPlay = !scanType || API_SCAN_TYPES.includes(scanType);
@@ -232,12 +232,6 @@ export function RedTeamOptionsPicker({
                     onChange({ ...value, self_play_defender_enabled })
                   }
                 />
-              )}
-              {analysisMode === "offline" && value.self_play_enabled && (
-                <p className="text-xs text-ink-muted">
-                  Offline mode uses deterministic L0 mutations. Enable Cloud enhanced analysis for
-                  LLM attacker and defender agents.
-                </p>
               )}
             </div>
           )}

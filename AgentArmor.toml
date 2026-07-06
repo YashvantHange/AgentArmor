@@ -8,6 +8,9 @@ rate_limit_rps = 5
 timeout_s = 30
 
 [detection]
+# Multi-agent (cloud) analysis runs on every scan — the offline analysis mode was
+# removed in v1.4.0. Set an analysis provider API key via AGENTARMOR_ANALYSIS_API_KEY
+# or [detection.agentic].api_key below; scans without a key are rejected.
 mode = "local"
 api_url = "http://127.0.0.1:8787"
 l1_enabled = true

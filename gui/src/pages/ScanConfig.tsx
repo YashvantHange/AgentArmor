@@ -40,13 +40,13 @@ export default function ScanConfig() {
   const navigate = useNavigate();
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [analysis, setAnalysis] = useState<AnalysisModeValue>({ analysis_mode: "offline" });
+  const [analysis, setAnalysis] = useState<AnalysisModeValue>({ analysis_mode: "cloud" });
   const [redTeam, setRedTeam] = useState<RedTeamOptions>(DEFAULT_REDTEAM);
 
   useEffect(() => {
     api.getSettings().then((s) => {
       setAnalysis({
-        analysis_mode: (s.analysis_mode as "offline" | "cloud") || "offline",
+        analysis_mode: "cloud",
         analysis_provider: s.analysis_provider,
         analysis_model: s.analysis_model,
         analysis_api_key: s.analysis_api_key,

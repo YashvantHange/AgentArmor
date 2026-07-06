@@ -17,7 +17,7 @@ import { useTheme } from "../hooks/useTheme";
 export default function SettingsPage() {
   const { theme, setTheme } = useTheme();
   const [settings, setSettings] = useState<Settings | null>(null);
-  const [analysis, setAnalysis] = useState<AnalysisModeValue>({ analysis_mode: "offline" });
+  const [analysis, setAnalysis] = useState<AnalysisModeValue>({ analysis_mode: "cloud" });
   const [redTeam, setRedTeam] = useState<RedTeamOptions>(DEFAULT_REDTEAM);
   const [error, setError] = useState("");
   const [saved, setSaved] = useState(false);
@@ -28,7 +28,7 @@ export default function SettingsPage() {
       .then((s) => {
         setSettings(s);
         setAnalysis({
-          analysis_mode: (s.analysis_mode as "offline" | "cloud") || "offline",
+          analysis_mode: "cloud",
           analysis_provider: s.analysis_provider,
           analysis_model: s.analysis_model,
           analysis_api_key: s.analysis_api_key,

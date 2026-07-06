@@ -8,15 +8,16 @@ from agentarmor.api.app import app
 client = TestClient(app)
 
 
-def test_multi_agent_redteam_requires_cloud_key():
+def test_scan_requires_analysis_key(monkeypatch):
+    """Every scan now requires a multi-agent analysis API key (offline mode removed)."""
+    monkeypatch.delenv("AGENTARMOR_ANALYSIS_API_KEY", raising=False)
     r = client.post(
         "/v1/scans",
         json={
             "target_type": "endpoint",
             "url": "http://127.0.0.1:8000/v1/chat",
             "scan_mode": "multi_agent_redteam",
-            "analysis_mode": "offline",
         },
     )
     assert r.status_code == 400
-    assert "multi_agent_redteam" in r.json()["detail"]
+    assert "analysis API key" in r.json()["detail"]

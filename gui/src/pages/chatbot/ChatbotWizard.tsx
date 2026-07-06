@@ -29,7 +29,7 @@ export default function ChatbotWizard() {
   const [provider, setProvider] = useState("openai");
   const [model, setModel] = useState("");
   const [authToken, setAuthToken] = useState("");
-  const [analysis, setAnalysis] = useState<AnalysisModeValue>({ analysis_mode: "offline" });
+  const [analysis, setAnalysis] = useState<AnalysisModeValue>({ analysis_mode: "cloud" });
   const [redTeam, setRedTeam] = useState<RedTeamOptions>(DEFAULT_REDTEAM);
   const [connMsg, setConnMsg] = useState("");
   const [error, setError] = useState("");
@@ -38,7 +38,7 @@ export default function ChatbotWizard() {
   useEffect(() => {
     api.getSettings().then((s) => {
       setAnalysis({
-        analysis_mode: (s.analysis_mode as "offline" | "cloud") || "offline",
+        analysis_mode: "cloud",
         analysis_provider: s.analysis_provider,
         analysis_model: s.analysis_model,
         analysis_api_key: s.analysis_api_key,
@@ -189,7 +189,7 @@ export default function ChatbotWizard() {
             {redTeam.l0_enabled ? ` (up to ${redTeam.max_variants_per_goal} variants/goal)` : ""}
             {redTeam.self_play_enabled ? ", self-play red teaming" : ""}
             {redTeam.self_play_discovery_enabled ? ", and attack discovery" : ""} in{" "}
-            <strong>{analysis.analysis_mode}</strong> mode.
+            <strong>multi-agent</strong> mode.
           </p>
           {error && <Alert tone="error">{error}</Alert>}
           <div className="flex gap-2">

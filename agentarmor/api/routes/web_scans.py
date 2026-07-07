@@ -289,7 +289,8 @@ async def create_web_scan(body: WebScanCreateRequest, background_tasks: Backgrou
         raise HTTPException(400, "planner_enabled requires scan_depth=multi_agentic")
 
     cfg = load_config(_config_path if _config_path.exists() else None)
-    _enforce_rate_limit(cfg)
+    # Validate inputs (incl. the required analysis key) before touching the DB, and
+    # ensure the schema exists before the rate-limit query.
     body = _validate_multi_agentic(body)
     try:
         ensure_analysis_ready(_cfg_with_analysis(body))
@@ -297,6 +298,7 @@ async def create_web_scan(body: WebScanCreateRequest, background_tasks: Backgrou
         raise HTTPException(400, str(exc)) from exc
 
     _repo.ensure_schema()
+    _enforce_rate_limit(cfg)
     scan = build_web_scan(
         body.page_url,
         owasp_filters=body.owasp_filters,

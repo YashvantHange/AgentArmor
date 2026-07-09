@@ -62,6 +62,7 @@ async def execute_scan(
 
     try:
         findings = repo.list_findings(scan_id=completed.id)
+        _annotate_analysis_health(config, completed, findings)
         paths = write_reports(config, completed, findings, output_dir, formats, output_file)
         completed.metadata["reports"] = [str(p) for p in paths]
         repo.save_scan(completed)
@@ -70,3 +71,44 @@ async def execute_scan(
         _log.exception("Scan %s report generation failed", scan.id)
         await _mark_scan_failed(repo, completed, str(exc))
         raise
+
+
+def _annotate_analysis_health(config: AppConfig, scan: Scan, findings: list) -> None:
+    """Flag when cloud multi-agent analysis failed for every finding.
+
+    Preflight catches an outright-invalid key, but a key can still fail mid-scan
+    (quota exhausted, rate limits, provider outage). When that leaves every
+    finding on the catalog fallback, record it so the CLI and report can say the
+    results are signature/heuristic only rather than a complete cloud scan.
+    """
+    if not config.detection.agentic.enabled or not findings:
+        return
+    fallbacks = 0
+    reasons: set[str] = set()
+    for f in findings:
+        enr = (f.metadata or {}).get("enrichment") or {}
+        if enr.get("agentic_fallback"):
+            fallbacks += 1
+            for step in enr.get("agent_trace") or []:
+                err = (step or {}).get("error")
+                if err:
+                    low = str(err).lower()
+                    if "rate" in low and "limit" in low:
+                        reasons.add("rate limit")
+                    elif "quota" in low or "insufficient" in low:
+                        reasons.add("quota/billing")
+                    elif "authentication" in low or "api key" in low:
+                        reasons.add("invalid key")
+                    elif "timeout" in low:
+                        reasons.add("timeout")
+    if fallbacks != len(findings):
+        return
+    hint = f" ({', '.join(sorted(reasons))})" if reasons else ""
+    scan.metadata["analysis_health"] = {
+        "cloud_ok": False,
+        "message": (
+            "Cloud multi-agent analysis failed for all findings"
+            f"{hint} — results shown are signature/heuristic only. "
+            "Verify your analysis API key and its quota."
+        ),
+    }

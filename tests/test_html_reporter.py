@@ -97,3 +97,27 @@ def test_html_report_flags_cloud_fallback(tmp_path):
     ]
     html = write_html_report(scan, findings, tmp_path / "r.html").read_text(encoding="utf-8")
     assert "baseline catalog analysis" in html
+
+
+def test_html_report_shows_analysis_health_banner(tmp_path):
+    scan = Scan(target=Target(url="http://localhost/v1/chat/completions"), probe_count=3, finding_count=1)
+    scan.metadata["analysis_health"] = {
+        "cloud_ok": False,
+        "message": "Cloud multi-agent analysis failed for all findings — results shown are signature/heuristic only.",
+    }
+    findings = [
+        Finding(
+            scan_id=scan.id,
+            probe_id="l1.dan",
+            probe_name="DAN",
+            owasp=["LLM01"],
+            title="Jailbreak",
+            severity=Severity.HIGH,
+            decision=Decision.FAIL,
+            risk_score=0.8,
+            response_excerpt="ok",
+        )
+    ]
+    html = write_html_report(scan, findings, tmp_path / "r.html").read_text(encoding="utf-8")
+    assert "analysis-warning" in html
+    assert "signature/heuristic only" in html

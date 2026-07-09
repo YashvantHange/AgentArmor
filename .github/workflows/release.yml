@@ -85,9 +85,11 @@ jobs:
   pypi:
     runs-on: ubuntu-latest
     if: github.event_name == 'push'
+    # Publishes with an API token. Requires the repo secret PYPI_API_TOKEN
+    # (Settings > Secrets and variables > Actions), created as a PyPI project-scoped
+    # token on pypi.org. continue-on-error keeps the installer release from being
+    # blocked if the token is missing/expired. See docs/RELEASING.md.
     continue-on-error: true
-    permissions:
-      id-token: write
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

@@ -243,6 +243,9 @@ async def continue_auth_session(
     cfg = _cfg_with_analysis(body_for_validation)
     try:
         ensure_analysis_ready(cfg)
+        from agentarmor.detection.agentic.preflight import validate_analysis_key
+
+        await validate_analysis_key(cfg)
     except ValueError as exc:
         raise HTTPException(400, str(exc)) from exc
     try:
@@ -292,7 +295,11 @@ async def create_web_scan(body: WebScanCreateRequest, background_tasks: Backgrou
     # ensure the schema exists before the rate-limit query.
     body = _validate_multi_agentic(body)
     try:
-        ensure_analysis_ready(_cfg_with_analysis(body))
+        _cfg = _cfg_with_analysis(body)
+        ensure_analysis_ready(_cfg)
+        from agentarmor.detection.agentic.preflight import validate_analysis_key
+
+        await validate_analysis_key(_cfg)
     except ValueError as exc:
         raise HTTPException(400, str(exc)) from exc
 

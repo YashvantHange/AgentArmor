@@ -166,6 +166,10 @@ async def create_scan(body: ScanCreateRequest, background_tasks: BackgroundTasks
     try:
         cfg = _build_config(body)
         ensure_analysis_ready(cfg)
+        # Fail fast on an invalid analysis key instead of degrading silently.
+        from agentarmor.detection.agentic.preflight import validate_analysis_key
+
+        await validate_analysis_key(cfg)
     except ValueError as exc:
         raise HTTPException(400, str(exc)) from exc
     if cfg.features.planner_v2:

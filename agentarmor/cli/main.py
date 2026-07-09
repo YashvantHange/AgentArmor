@@ -128,6 +128,11 @@ def scan(
             auth_token=auth_token,
         )
         ensure_analysis_ready(cfg)
+        # Fail fast on an invalid analysis key rather than running a full scan
+        # that silently degrades to signature-only results.
+        from agentarmor.detection.agentic.preflight import validate_analysis_key
+
+        asyncio.run(validate_analysis_key(cfg))
     except ValueError as exc:
         typer.echo(f"Error: {exc}", err=True)
         raise typer.Exit(1)
@@ -149,6 +154,9 @@ def scan(
 
         completed, paths = await execute_scan(cfg, formats=formats, output_file=output)
         typer.echo(f"Scan {completed.id} completed: {completed.finding_count} finding(s)")
+        health = (completed.metadata or {}).get("analysis_health") or {}
+        if health.get("cloud_ok") is False:
+            typer.echo(f"Warning: {health.get('message')}", err=True)
         for p in paths:
             typer.echo(f"  Report: {p}")
 

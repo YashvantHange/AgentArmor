@@ -50,6 +50,7 @@ _HTML_TEMPLATE = """<!DOCTYPE html>
     .score-line { color: #475569; font-size: 0.9rem; }
     .score-chip { display: inline-block; background: #f1f5f9; color: #334155; padding: 0.1rem 0.4rem; border-radius: 4px; font-size: 0.8rem; margin-right: 0.25rem; }
     .fallback-note { color: #b45309; font-size: 0.85rem; }
+    .analysis-warning { background: #fffbeb; border: 1px solid #f59e0b; border-left: 4px solid #f59e0b; color: #92400e; padding: 0.75rem 1rem; border-radius: 6px; margin: 0 0 1.25rem; font-weight: 500; }
     footer { margin-top: 2rem; color: #94a3b8; font-size: 0.85rem; }
   </style>
 </head>
@@ -58,6 +59,9 @@ _HTML_TEMPLATE = """<!DOCTYPE html>
   <p class="meta">Scan ID: {{ scan.id }} · Target: {{ target_label }} · Status: {{ scan.status.value }}</p>
 
   <h2>Executive Summary</h2>
+  {% if analysis_health and analysis_health.get('cloud_ok') == False %}
+  <div class="analysis-warning">&#9888; {{ analysis_health.get('message') }}</div>
+  {% endif %}
   {% if capability_map %}
   <div class="card" style="margin-bottom:1.5rem;">
     <h3>Agent Capability Map</h3>
@@ -265,6 +269,7 @@ def write_html_report(
 
     capability_map = scan.metadata.get("capability_map") if scan.metadata else None
     attack_plan = scan.metadata.get("attack_plan") if scan.metadata else None
+    analysis_health = scan.metadata.get("analysis_health") if scan.metadata else None
 
     html = Template(_HTML_TEMPLATE).render(
         scan=scan,
@@ -276,6 +281,7 @@ def write_html_report(
         owasp_names=owasp_names,
         capability_map=capability_map,
         attack_plan=attack_plan,
+        analysis_health=analysis_health,
         version=version,
     )
     output_path.parent.mkdir(parents=True, exist_ok=True)

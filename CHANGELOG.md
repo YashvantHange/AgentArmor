@@ -11,6 +11,42 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Critic/ensemble judge (independent second opinion in the uncertain band)
 - Unified finding clustering for the webscan→redteam escalation path
 
+## [1.4.1] - 2026-07-09
+
+### Added — detection coverage
+- **Many new attack signatures** for LLM/chatbot/MCP targets, each tagged with an
+  OWASP LLM Top 10 id and a CWE: system-prompt extraction, roleplay/virtualization
+  (pretend, hypothetical/fictional framing, the "grandma" exploit, AIM/Machiavellian),
+  encoding & obfuscation (base64/rot13 decode-and-run, payload splitting, leetspeak),
+  indirect/RAG injection markers, data exfiltration (URL, markdown-image beacon,
+  private-key and env-var leaks), and MCP/tool abuse (tool-description poisoning,
+  ignore-tool-schema, cross-server confused deputy, excessive-permission requests).
+  The unified rule catalog grew from ~21 to 41 rules.
+- L1 evidence spans now carry `owasp` and `cwe`; a `rule_by_name()` helper exposes
+  rule metadata to the reporting layer.
+
+### Added — understandable results
+- HTML reports now include a **"How AgentArmor analyzed this"** panel per finding that
+  lists each analysis agent (Triage → Analyst → OWASP Mapper → Remediation → Synthesis)
+  in plain language with its model and latency, plus a **"How we scored this"** line
+  explaining which detection layers fired and how they combined into the risk score.
+
+### Changed — cloud-only cleanup
+- Removed the last remnants of the offline analysis mode: the dead `--analysis-mode offline`
+  CLI option is gone, `apply_analysis_options` no longer takes `analysis_mode`, and defaults
+  now resolve to cloud everywhere. The internal catalog pre-fill (formerly
+  `enrich_finding_offline`) is renamed `enrich_finding_base` and is used only as a fallback
+  when cloud enrichment cannot complete.
+
+### Changed — Rust/Python parity
+- The native Rust L1 engine now embeds the **same `catalog.yaml`** at compile time and
+  applies the identical rule selection as the Python fallback, ending the long-standing rule
+  drift (11 vs 21 rules). A parity test guards against regressions.
+
+### Discoverability
+- Rewritten README intro with search-optimized keywords and badges; added PyPI `keywords`
+  and `classifiers`; refreshed the GitHub repository About + topics.
+
 ## [1.4.0] - 2026-07-05
 
 ### Changed — Multi-agentic only

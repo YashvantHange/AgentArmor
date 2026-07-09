@@ -9,7 +9,7 @@ from pathlib import Path
 
 import yaml
 
-RULE_CATALOG_VERSION = "2026.06.1"
+RULE_CATALOG_VERSION = "2026.07.1"
 
 _CATALOG_PATH = Path(__file__).resolve().parent / "catalog.yaml"
 
@@ -23,6 +23,8 @@ class SecurityRule:
     l2_class: str | None = None
     l2_weight: float = 0.0
     outcome_weight: float = 0.0
+    owasp: tuple[str, ...] = ()
+    cwe: str | None = None
 
 
 @lru_cache(maxsize=1)
@@ -31,6 +33,9 @@ def _load_raw_rules() -> list[SecurityRule]:
         data = yaml.safe_load(_CATALOG_PATH.read_text(encoding="utf-8"))
         rules = []
         for item in data.get("rules", []):
+            owasp = item.get("owasp") or []
+            if isinstance(owasp, str):
+                owasp = [owasp]
             rules.append(
                 SecurityRule(
                     name=str(item["name"]),
@@ -40,10 +45,20 @@ def _load_raw_rules() -> list[SecurityRule]:
                     l2_class=item.get("l2_class"),
                     l2_weight=float(item.get("l2_weight", 0.0)),
                     outcome_weight=float(item.get("outcome_weight", 0.0)),
+                    owasp=tuple(str(o) for o in owasp),
+                    cwe=item.get("cwe"),
                 )
             )
         return rules
     return _builtin_rules()
+
+
+def rule_by_name(name: str) -> SecurityRule | None:
+    """Look up a catalog rule by its name (e.g. to enrich a finding)."""
+    for rule in _load_raw_rules():
+        if rule.name == name:
+            return rule
+    return None
 
 
 def _builtin_rules() -> list[SecurityRule]:

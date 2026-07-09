@@ -14,6 +14,8 @@ class SignatureRule:
     category: str
     weight: float
     pattern: re.Pattern[str]
+    owasp: tuple[str, ...] = ()
+    cwe: str | None = None
 
 
 SIGNATURE_RULES: list[SignatureRule] = [
@@ -22,6 +24,8 @@ SIGNATURE_RULES: list[SignatureRule] = [
         category=rule.category,
         weight=rule.l1_weight,
         pattern=re.compile(rule.pattern),
+        owasp=rule.owasp,
+        cwe=rule.cwe,
     )
     for rule in security_rules()
     if rule.l1_weight > 0

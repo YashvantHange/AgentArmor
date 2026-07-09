@@ -11,6 +11,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Critic/ensemble judge (independent second opinion in the uncertain band)
 - Unified finding clustering for the webscan→redteam escalation path
 
+## [1.4.3] - 2026-07-10
+
+### Added — analysis-key preflight
+- A scan now validates the analysis API key with one cheap call before running.
+  An invalid/unauthorized key **fails fast** with a clear error instead of running a
+  full scan that silently degrades to signature-only results. Transient errors
+  (network, rate-limit, timeout) are non-fatal and don't block the scan.
+
+### Added — cloud-analysis health warning
+- When cloud multi-agent analysis fails for **every** finding mid-scan (e.g. quota
+  exhausted), the CLI prints a warning and the HTML report shows an Executive-Summary
+  banner, so results are not misread as a complete cloud scan.
+
+### Fixed — PyPI publishing
+- The release workflow's `pypi` job no longer requests `id-token: write`, which had
+  caused it to attempt (unconfigured) OIDC trusted publishing and fail. It now uses
+  API-token auth via the `PYPI_API_TOKEN` secret. See `docs/RELEASING.md`.
+
 ## [1.4.2] - 2026-07-09
 
 ### Added — proof-of-concept in every report

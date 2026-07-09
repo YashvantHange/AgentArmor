@@ -108,7 +108,6 @@ def _cfg_with_analysis(body: WebScanCreateRequest | WebScanContinueRequest):
     cfg = load_config(_config_path if _config_path.exists() else None)
     cfg = apply_analysis_options(
         cfg,
-        analysis_mode=body.analysis_mode,
         analysis_provider=body.analysis_provider,
         analysis_model=body.analysis_model,
         analysis_api_key=body.analysis_api_key,

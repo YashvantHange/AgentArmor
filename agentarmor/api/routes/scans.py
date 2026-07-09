@@ -97,7 +97,6 @@ def _build_config(body: ScanCreateRequest):
         raise HTTPException(400, f"unsupported target_type: {body.target_type}")
     cfg = apply_analysis_options(
         cfg,
-        analysis_mode=body.analysis_mode,
         analysis_provider=body.analysis_provider,
         analysis_model=body.analysis_model,
         analysis_api_key=body.analysis_api_key,

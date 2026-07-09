@@ -91,6 +91,30 @@ async def test_enrich_finding_cloud_agentic_failure_falls_back(monkeypatch):
     assert enriched.plain_title
 
 
+@pytest.mark.asyncio
+async def test_agentic_all_calls_failing_is_flagged_as_fallback(monkeypatch):
+    """If every agent LLM call errors, the result must be flagged as a fallback
+    and NOT reported as a successful cloud analysis."""
+    from agentarmor.detection.agentic import coordinator
+    from agentarmor.reporting.enrichment import enrich_finding_base
+
+    async def _always_fail(config, system, user, agent_name):
+        return None, {"agent": agent_name, "model": "gpt-4o-mini", "error": "AuthenticationError"}
+
+    monkeypatch.setattr(coordinator, "_llm_json", _always_fail)
+
+    cfg = load_config()
+    cfg.detection.agentic.api_key = "sk-bad"
+    finding = _sample_finding()
+    result = _sample_result()
+    base = enrich_finding_base(finding, result, cfg)
+    enriched = await coordinator.enrich_finding_agentic(finding, result, cfg, base_enrichment=base)
+
+    assert enriched.agentic_fallback is True
+    assert enriched.agent_trace  # trace is still attached for transparency
+    assert all(step.get("status") == "error" for step in enriched.agent_trace)
+
+
 def test_apply_analysis_options_cloud_enables_agentic():
     from agentarmor.core.config import apply_analysis_options
 

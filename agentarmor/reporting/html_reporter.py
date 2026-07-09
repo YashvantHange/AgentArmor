@@ -30,6 +30,26 @@ _HTML_TEMPLATE = """<!DOCTYPE html>
     th { background: #f1f5f9; }
     .owasp-tag { display: inline-block; background: #e0e7ff; color: #3730a3; padding: 0.1rem 0.4rem; border-radius: 4px; font-size: 0.8rem; margin-right: 0.25rem; }
     .evidence { font-family: monospace; font-size: 0.85rem; background: #f8fafc; padding: 0.5rem; border-radius: 4px; white-space: pre-wrap; }
+    .poc { margin: 0.5rem 0; }
+    .poc-label { font-weight: 600; font-size: 0.85rem; margin-bottom: 0.2rem; }
+    .poc-attack { border-left: 3px solid #dc2626; }
+    .poc-attack .poc-label { color: #dc2626; }
+    .poc-proof { border-left: 3px solid #16a34a; }
+    .poc-proof .poc-label { color: #16a34a; }
+    .poc pre { font-family: ui-monospace, monospace; font-size: 0.82rem; background: #0f172a; color: #e2e8f0; padding: 0.6rem 0.75rem; border-radius: 4px; white-space: pre-wrap; word-break: break-word; margin: 0; }
+    .signal-tag { display: inline-block; background: #fee2e2; color: #991b1b; padding: 0.1rem 0.4rem; border-radius: 4px; font-size: 0.78rem; margin: 0.15rem 0.25rem 0 0; font-family: ui-monospace, monospace; }
+    .analysis-panel { margin-top: 0.75rem; border: 1px solid #e2e8f0; border-radius: 6px; background: #ffffff; }
+    .analysis-panel > summary { cursor: pointer; padding: 0.5rem 0.75rem; font-weight: 600; color: #0f172a; }
+    .agent-steps { list-style: none; margin: 0; padding: 0.25rem 0.75rem 0.75rem; }
+    .agent-steps li { padding: 0.5rem 0; border-bottom: 1px solid #f1f5f9; }
+    .agent-steps li:last-child { border-bottom: none; }
+    .agent-name { font-weight: 600; color: #3730a3; }
+    .agent-does { color: #475569; }
+    .agent-meta { color: #94a3b8; font-size: 0.8rem; }
+    .agent-status-error { color: #dc2626; }
+    .score-line { color: #475569; font-size: 0.9rem; }
+    .score-chip { display: inline-block; background: #f1f5f9; color: #334155; padding: 0.1rem 0.4rem; border-radius: 4px; font-size: 0.8rem; margin-right: 0.25rem; }
+    .fallback-note { color: #b45309; font-size: 0.85rem; }
     footer { margin-top: 2rem; color: #94a3b8; font-size: 0.85rem; }
   </style>
 </head>
@@ -135,13 +155,64 @@ _HTML_TEMPLATE = """<!DOCTYPE html>
   {% if e %}
   <div class="card" style="margin-bottom:1rem;">
     <h3>{{ e.get('plain_title') or f.probe_name }}</h3>
+    <p class="meta">{{ f.probe_id }} · {{ f.severity.value }} · risk {{ "%.2f"|format(f.risk_score) }}
+      {% for t in f.owasp %}<span class="owasp-tag">{{ t }}</span>{% endfor %}</p>
     {% if e.get('what_happened') %}<p><strong>What happened:</strong> {{ e.what_happened }}</p>{% endif %}
     {% if e.get('why_it_matters') %}<p><strong>Why it matters:</strong> {{ e.why_it_matters }}</p>{% endif %}
+
+    {# ---- Proof of concept: the attack we sent and the proof it worked ---- #}
+    {% if f.request_summary %}
+    <div class="poc poc-attack">
+      <div class="poc-label">Attack we sent (payload)</div>
+      <pre>{{ f.request_summary }}</pre>
+    </div>
+    {% endif %}
+    {% if f.response_excerpt %}
+    <div class="poc poc-proof">
+      <div class="poc-label">Proof — the target's response</div>
+      <pre>{{ f.response_excerpt[:800] }}</pre>
+    </div>
+    {% endif %}
+    {% if f.evidence %}
+    <div class="poc">
+      <div class="poc-label">Signals that fired</div>
+      {% for ev in f.evidence[:8] %}<span class="signal-tag">{{ ev }}</span>{% endfor %}
+    </div>
+    {% endif %}
+
     {% if e.get('remediation') %}
     <p><strong>Remediation:</strong></p>
     <ul>{% for r in e.remediation %}<li>{{ r }}</li>{% endfor %}</ul>
     {% endif %}
     {% if e.get('agentic_notes') %}<p><strong>AI analyst notes:</strong> {{ e.agentic_notes }}</p>{% endif %}
+    {% if e.get('detection_summary') %}
+    <p class="score-line"><strong>How we scored this:</strong>
+      {% for layer, text in e.detection_summary.items() %}<span class="score-chip">{{ text }}</span>{% endfor %}
+      &mdash; combined into the risk score of <strong>{{ "%.2f"|format(f.risk_score) }}</strong>.
+    </p>
+    {% endif %}
+    {% if e.get('agent_trace') %}
+    <details class="analysis-panel">
+      <summary>How AgentArmor analyzed this ({{ e.agent_trace|length }} agents)</summary>
+      <ul class="agent-steps">
+        {% for step in e.agent_trace %}
+        <li>
+          <span class="agent-name">{{ loop.index }}. {{ step.get('label') or step.get('agent') }}</span>
+          <span class="agent-does">&mdash; {{ step.get('does') }}</span>
+          <span class="agent-meta">
+            ({{ step.get('model') or 'model' }}{% if step.get('latency_ms') is not none %}, {{ step.latency_ms }} ms{% endif %})
+            {% if step.get('status') == 'error' %}<span class="agent-status-error">step failed</span>{% endif %}
+          </span>
+        </li>
+        {% endfor %}
+      </ul>
+      {% if e.get('agentic_fallback') %}
+      <p class="fallback-note" style="padding:0 0.75rem 0.75rem;">Cloud analysis could not be completed for this finding &mdash; showing the baseline catalog analysis.</p>
+      {% endif %}
+    </details>
+    {% elif e.get('agentic_fallback') %}
+    <p class="fallback-note">Cloud multi-agent analysis was unavailable for this finding &mdash; showing the baseline catalog analysis.</p>
+    {% endif %}
   </div>
   {% endif %}
   {% endfor %}

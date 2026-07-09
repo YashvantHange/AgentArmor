@@ -195,6 +195,17 @@ async def enrich_finding_agentic(
         "owasp": owasp_map.model_dump() if owasp_map else {},
     }
     labelled_trace = _label_trace(trace)
+
+    # If every agent call errored (e.g. bad/missing key, provider outage, timeout),
+    # the cloud analysis did not actually run — fall back to the catalog analysis
+    # and flag it so the report doesn't misrepresent a failed run as a cloud result.
+    all_failed = bool(labelled_trace) and all(step.get("error") for step in labelled_trace)
+    produced_nothing = analyst is None and owasp_map is None and synthesis is None
+    if all_failed or produced_nothing:
+        base_enrichment.agentic_fallback = True
+        base_enrichment.agent_trace = labelled_trace
+        return base_enrichment
+
     if not validate_agentic_output(payload, response_excerpt=finding.response_excerpt, allowed_owasp=finding.owasp):
         base_enrichment.agentic_fallback = True
         base_enrichment.agent_trace = labelled_trace

@@ -7,7 +7,7 @@
 Every scan runs a **multi-agent analysis** that scores findings on a 0–100 risk model, maps them to the **OWASP LLM Top 10**, explains *in plain English* what went wrong and how to fix it, and exports reports for developers and security teams (SARIF, HTML, PDF, CSV).
 
 <p>
-  <img alt="Version" src="https://img.shields.io/badge/version-1.4.1-blue" />
+  <img alt="Version" src="https://img.shields.io/badge/version-1.4.2-blue" />
   <a href="https://pypi.org/project/agentarmor/"><img alt="PyPI" src="https://img.shields.io/pypi/v/agentarmor?color=blue&label=pypi" /></a>
   <img alt="Python" src="https://img.shields.io/badge/python-3.10%2B-blue" />
   <img alt="License" src="https://img.shields.io/badge/license-MIT-green" />
@@ -15,7 +15,7 @@ Every scan runs a **multi-agent analysis** that scores findings on a 0–100 ris
   <a href="https://github.com/YashvantHange/AgentArmor/stargazers"><img alt="Stars" src="https://img.shields.io/github/stars/YashvantHange/AgentArmor?style=social" /></a>
 </p>
 
-**Latest release:** [v1.4.1](https://github.com/YashvantHange/AgentArmor/releases/tag/v1.4.1) · [Changelog](CHANGELOG.md)
+**Latest release:** [v1.4.2](https://github.com/YashvantHange/AgentArmor/releases/tag/v1.4.2) · [Changelog](CHANGELOG.md)
 
 > 🔍 **Who it's for:** AI engineers shipping LLM features, red teamers and pentesters testing GenAI apps, and security teams that need OWASP-mapped, audit-ready reports.
 
@@ -47,7 +47,7 @@ Every scan runs a **multi-agent analysis** that scores findings on a 0–100 ris
 
 ### Windows desktop (recommended)
 
-1. Download **`AgentArmor_1.4.1_x64-setup.exe`** or **`.msi`** from [Releases](https://github.com/YashvantHange/AgentArmor/releases/latest)
+1. Download **`AgentArmor_1.4.2_x64-setup.exe`** or **`.msi`** from [Releases](https://github.com/YashvantHange/AgentArmor/releases/latest)
 2. Run the installer
 3. Open **AgentArmor** → choose scan type (API, Local Model, Agent, MCP, RAG, Benchmark)
 4. Configure target → run scan → review findings → export reports

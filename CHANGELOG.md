@@ -11,6 +11,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Critic/ensemble judge (independent second opinion in the uncertain band)
 - Unified finding clustering for the webscan→redteam escalation path
 
+## [1.4.2] - 2026-07-09
+
+### Added — proof-of-concept in every report
+- Each finding in the HTML report now shows **"Attack we sent (payload)"** (the exact
+  request used), **"Proof — the target's response"** (the response that proves the issue),
+  and **"Signals that fired"** (which detection rules matched) — so every result carries
+  both the proof and what was used to obtain it.
+- Re-landed the analysis-transparency panel (**"How AgentArmor analyzed this"** +
+  **"How we scored this"**) that a stacked-branch merge had kept out of `main` in 1.4.1.
+
+### Fixed — cloud analysis status
+- When every analysis agent errors (bad/missing key, provider outage, timeout), the finding
+  is now correctly flagged as a fallback and keeps the catalog analysis, instead of being
+  reported as a successful cloud multi-agent result.
+
 ## [1.4.1] - 2026-07-09
 
 ### Added — detection coverage

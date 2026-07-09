@@ -1,4 +1,4 @@
-"""Tests for finding enrichment (offline catalog and cloud fallback)."""
+"""Tests for finding enrichment (catalog pre-fill and cloud multi-agent path)."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ import pytest
 
 from agentarmor.core.config import AppConfig, DetectionConfig, load_config
 from agentarmor.core.models import Decision, Finding, ProbeRequest, ProbeResponse, ProbeResult, Severity
-from agentarmor.reporting.enrichment import enrich_finding, enrich_finding_offline
+from agentarmor.reporting.enrichment import enrich_finding, enrich_finding_base
 
 
 def _sample_finding(probe_id: str = "jailbreak.dan") -> Finding:
@@ -35,26 +35,30 @@ def _sample_result() -> ProbeResult:
     )
 
 
-def test_enrich_finding_offline_populates_catalog_fields():
+def test_enrich_finding_base_populates_catalog_fields():
     cfg = load_config()
     finding = _sample_finding()
     result = _sample_result()
-    enriched = enrich_finding_offline(finding, result, cfg)
+    enriched = enrich_finding_base(finding, result, cfg)
     assert enriched.plain_title
     assert enriched.what_happened
     assert enriched.why_it_matters
-    assert enriched.analysis_mode == "offline"
+    assert enriched.analysis_mode == "cloud"
     assert enriched.remediation
     assert any(o["id"] == "LLM01" for o in enriched.owasp)
     assert "l1" in enriched.detection_summary
 
 
 @pytest.mark.asyncio
-async def test_enrich_finding_offline_mode_by_default():
+async def test_enrich_finding_without_api_key_falls_back_to_base():
+    # Cloud analysis is the only path; with no key we return the catalog pre-fill
+    # flagged as a fallback rather than silently running an "offline" mode.
     cfg = load_config()
+    cfg.detection.agentic.api_key = ""
     enriched = await enrich_finding(_sample_finding(), _sample_result(), cfg)
-    assert enriched.analysis_mode == "offline"
-    assert enriched.agentic_fallback is False
+    assert enriched.analysis_mode == "cloud"
+    assert enriched.agentic_fallback is True
+    assert enriched.plain_title
 
 
 @pytest.mark.asyncio
@@ -91,7 +95,7 @@ def test_apply_analysis_options_cloud_enables_agentic():
     from agentarmor.core.config import apply_analysis_options
 
     cfg = load_config()
-    cfg = apply_analysis_options(cfg, analysis_mode="cloud", analysis_api_key="sk-x")
+    cfg = apply_analysis_options(cfg, analysis_api_key="sk-x")
     assert cfg.detection.analysis_mode == "cloud"
     assert cfg.detection.agentic.enabled is True
     assert cfg.detection.agentic.api_key == "sk-x"

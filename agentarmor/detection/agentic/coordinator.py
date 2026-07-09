@@ -80,11 +80,47 @@ async def _llm_json(
         return None, trace
 
 
+# Plain-language description of what each analysis agent does, surfaced in reports
+# and the GUI so any user can follow how a finding was analyzed.
+AGENT_ROLES: dict[str, dict[str, str]] = {
+    "triage": {
+        "label": "Triage",
+        "does": "sorts the finding into an attack category",
+    },
+    "analyst": {
+        "label": "Analyst",
+        "does": "explains the attack technique and cites evidence from the response",
+    },
+    "owasp_mapper": {
+        "label": "OWASP Mapper",
+        "does": "maps the issue to the OWASP LLM Top 10",
+    },
+    "remediation": {
+        "label": "Remediation",
+        "does": "writes concrete steps to fix the issue",
+    },
+    "synthesis": {
+        "label": "Synthesis",
+        "does": "summarizes everything in plain English",
+    },
+}
+
+
+def _label_trace(trace: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Attach human-readable labels/descriptions to each agent trace step."""
+    for step in trace:
+        role = AGENT_ROLES.get(step.get("agent", ""), {})
+        step.setdefault("label", role.get("label", step.get("agent", "agent").title()))
+        step.setdefault("does", role.get("does", ""))
+        step["status"] = "error" if step.get("error") else "ok"
+    return trace
+
+
 async def enrich_finding_agentic(
     finding: Finding,
     result: ProbeResult,
     config: AppConfig,
-    offline_base: EnrichmentResult,
+    base_enrichment: EnrichmentResult,
 ) -> EnrichmentResult:
     target_type = config.target.type.value
     prompt_text = truncate(finding.request_summary)
@@ -158,27 +194,29 @@ async def enrich_finding_agentic(
         "analyst": analyst.model_dump() if analyst else {},
         "owasp": owasp_map.model_dump() if owasp_map else {},
     }
+    labelled_trace = _label_trace(trace)
     if not validate_agentic_output(payload, response_excerpt=finding.response_excerpt, allowed_owasp=finding.owasp):
-        offline_base.agentic_fallback = True
-        return offline_base
+        base_enrichment.agentic_fallback = True
+        base_enrichment.agent_trace = labelled_trace
+        return base_enrichment
 
     owasp_ids = list(finding.owasp)
     if owasp_map and owasp_map.owasp_ids:
         owasp_ids = list(dict.fromkeys(owasp_map.owasp_ids + owasp_ids))
 
-    remed_steps = list(offline_base.remediation)
+    remed_steps = list(base_enrichment.remediation)
     if remediation and remediation.steps:
         remed_steps = remediation.steps
 
     return EnrichmentResult(
-        plain_title=offline_base.plain_title,
-        what_happened=synthesis.summary if synthesis and synthesis.summary else offline_base.what_happened,
-        why_it_matters=offline_base.why_it_matters,
+        plain_title=base_enrichment.plain_title,
+        what_happened=synthesis.summary if synthesis and synthesis.summary else base_enrichment.what_happened,
+        why_it_matters=base_enrichment.why_it_matters,
         owasp=owasp_entries(owasp_ids),
         remediation=remed_steps,
-        detection_summary=offline_base.detection_summary,
+        detection_summary=base_enrichment.detection_summary,
         agentic_notes=synthesis.analyst_notes if synthesis else (analyst.narrative if analyst else None),
-        agent_trace=trace,
+        agent_trace=labelled_trace,
         analysis_mode="cloud",
     )
 

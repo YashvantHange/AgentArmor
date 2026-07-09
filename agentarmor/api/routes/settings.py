@@ -20,7 +20,7 @@ class SettingsResponse(BaseModel):
     model_dir: str = "~/.agentarmor/models"
     output_dir: str = "./reports"
     api_url: str = "http://127.0.0.1:8787"
-    analysis_mode: str = "offline"
+    analysis_mode: str = "cloud"
     analysis_provider: str = "openai"
     analysis_model: str = "gpt-4o-mini"
     analysis_api_key: str = ""

@@ -1,10 +1,23 @@
-# AgentArmor
+# 🛡️ AgentArmor — AI Security Scanner & LLM Red-Teaming Platform
 
-**The Armor for AI Security** — continuously test, audit, and red-team LLM APIs, agents, MCP servers, and RAG systems.
+> **LLM security · AI red teaming · prompt-injection & jailbreak testing · MCP / agent / RAG security · OWASP LLM Top 10**
 
-AgentArmor runs structured security probes against your AI stack, scores findings with an enterprise risk model (0–100), maps results to **OWASP LLM Top 10**, and exports reports for developers and security teams (SARIF, HTML, PDF, CSV).
+**The Armor for AI Security.** AgentArmor is an open-source scanner that continuously tests, audits, and red-teams your AI stack — **LLM APIs, chatbots, tool-calling agents, MCP servers, and RAG pipelines** — for prompt injection, jailbreaks, system-prompt leaks, data exfiltration, and unsafe tool use.
+
+Every scan runs a **multi-agent analysis** that scores findings on a 0–100 risk model, maps them to the **OWASP LLM Top 10**, explains *in plain English* what went wrong and how to fix it, and exports reports for developers and security teams (SARIF, HTML, PDF, CSV).
+
+<p>
+  <img alt="Version" src="https://img.shields.io/badge/version-1.4.0-blue" />
+  <a href="https://pypi.org/project/agentarmor/"><img alt="PyPI" src="https://img.shields.io/pypi/v/agentarmor?color=blue&label=pypi" /></a>
+  <img alt="Python" src="https://img.shields.io/badge/python-3.10%2B-blue" />
+  <img alt="License" src="https://img.shields.io/badge/license-MIT-green" />
+  <img alt="OWASP LLM Top 10" src="https://img.shields.io/badge/OWASP-LLM%20Top%2010-black" />
+  <a href="https://github.com/YashvantHange/AgentArmor/stargazers"><img alt="Stars" src="https://img.shields.io/github/stars/YashvantHange/AgentArmor?style=social" /></a>
+</p>
 
 **Latest release:** [v1.4.0](https://github.com/YashvantHange/AgentArmor/releases/tag/v1.4.0) · [Changelog](CHANGELOG.md)
+
+> 🔍 **Who it's for:** AI engineers shipping LLM features, red teamers and pentesters testing GenAI apps, and security teams that need OWASP-mapped, audit-ready reports.
 
 ---
 

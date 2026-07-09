@@ -5,11 +5,42 @@ build-backend = "hatchling.build"
 [project]
 name = "agentarmor"
 version = "1.4.0"
-description = "AI Security Validation Platform — scan LLM APIs, agents, and models"
+description = "AI security scanner & red-teaming platform — test LLM APIs, agents, MCP servers, and RAG for prompt injection, jailbreaks, and OWASP LLM Top 10 risks."
 readme = "README.md"
 requires-python = ">=3.10"
 license = "MIT"
 authors = [{ name = "AgentArmor" }]
+keywords = [
+    "llm-security",
+    "ai-security",
+    "red-teaming",
+    "prompt-injection",
+    "jailbreak",
+    "mcp",
+    "model-context-protocol",
+    "owasp-llm-top-10",
+    "agent-security",
+    "genai-security",
+    "ai-safety",
+    "security-scanner",
+    "chatbot-security",
+    "llmops",
+    "rag-security",
+]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Information Technology",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Security",
+    "Topic :: Software Development :: Testing",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
 dependencies = [
     "typer>=0.12.0",
     "fastapi>=0.115.0",

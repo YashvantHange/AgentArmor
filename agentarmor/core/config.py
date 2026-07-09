@@ -115,7 +115,7 @@ class JudgeConfig(BaseModel):
 
 
 class AgenticConfig(BaseModel):
-    enabled: bool = False
+    enabled: bool = True
     provider: str = "openai"
     model: str = "gpt-4o-mini"
     api_key: str = ""
@@ -185,7 +185,9 @@ class L0AttackConfig(BaseModel):
 
 class DetectionConfig(BaseModel):
     mode: str = "local"  # local | api | hybrid
-    analysis_mode: str = "offline"  # offline | cloud
+    # Multi-agent cloud analysis is the only analysis path (offline mode removed).
+    # Kept as a field so internal gates can read it, but it always resolves to "cloud".
+    analysis_mode: str = "cloud"
     l0: L0AttackConfig = Field(default_factory=L0AttackConfig)
     self_play: SelfPlayConfig = Field(default_factory=SelfPlayConfig)
     api_url: str = "http://127.0.0.1:8787"
@@ -414,17 +416,14 @@ def _load_detection_config(raw: object) -> DetectionConfig:
 def apply_analysis_options(
     config: AppConfig,
     *,
-    analysis_mode: str | None = None,
     analysis_provider: str | None = None,
     analysis_model: str | None = None,
     analysis_api_key: str | None = None,
     auth_token: str | None = None,
 ) -> AppConfig:
-    if analysis_mode:
-        # Offline analysis mode is no longer supported — every scan runs the
-        # multi-agent (cloud) analysis path. Any requested mode resolves to cloud.
-        config.detection.analysis_mode = "cloud"
-        config.detection.agentic.enabled = True
+    # Every scan runs the multi-agent (cloud) analysis path; offline mode was removed.
+    config.detection.analysis_mode = "cloud"
+    config.detection.agentic.enabled = True
     if analysis_provider:
         config.detection.agentic.provider = analysis_provider
     if analysis_model:

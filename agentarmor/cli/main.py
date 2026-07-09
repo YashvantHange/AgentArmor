@@ -94,9 +94,6 @@ def scan(
         None, "--format", help="Report format: json, sarif, html, pdf, csv, or comma-separated"
     ),
     output: Optional[Path] = typer.Option(None, "--output", "-o", help="Output file path"),
-    analysis_mode: Optional[str] = typer.Option(
-        None, "--analysis-mode", help="Finding analysis: offline or cloud"
-    ),
     analysis_provider: Optional[str] = typer.Option(
         None, "--analysis-provider", help="Cloud analysis provider (openai, anthropic, gemini)"
     ),
@@ -125,7 +122,6 @@ def scan(
         )
         cfg = apply_analysis_options(
             cfg,
-            analysis_mode=analysis_mode,
             analysis_provider=analysis_provider,
             analysis_model=analysis_model,
             analysis_api_key=analysis_api_key,

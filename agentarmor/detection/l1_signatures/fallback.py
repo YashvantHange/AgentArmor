@@ -45,6 +45,8 @@ def scan(text: str, echo_spans: list | None = None) -> L1ScanResult:
                     "detector": "L1",
                     "rule": rule.name,
                     "weight": rule.weight,
+                    "owasp": list(getattr(rule, "owasp", ()) or ()),
+                    "cwe": getattr(rule, "cwe", None),
                 }
             )
 

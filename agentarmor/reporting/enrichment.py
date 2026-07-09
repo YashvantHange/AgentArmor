@@ -1,4 +1,10 @@
-"""Finding enrichment — offline catalog and cloud agentic pipeline."""
+"""Finding enrichment — local catalog pre-fill plus the cloud multi-agent pipeline.
+
+Every scan runs the cloud multi-agent analysis. The catalog pre-fill below seeds
+each finding with baseline wording and only surfaces on its own if the cloud
+enrichment cannot complete (network/model error), in which case the finding is
+flagged with ``agentic_fallback = True``.
+"""
 
 from __future__ import annotations
 
@@ -21,15 +27,16 @@ class EnrichmentResult(BaseModel):
     detection_summary: dict[str, str] = Field(default_factory=dict)
     agentic_notes: str | None = None
     agent_trace: list[dict[str, Any]] = Field(default_factory=list)
-    analysis_mode: str = "offline"
+    analysis_mode: str = "cloud"
     agentic_fallback: bool = False
 
 
-def enrich_finding_offline(
+def enrich_finding_base(
     finding: Finding,
     result: ProbeResult,
     config: AppConfig,
 ) -> EnrichmentResult:
+    """Seed a finding with catalog-based wording before cloud enrichment runs."""
     target_type = config.target.type.value
     formatted = format_entry(
         finding.probe_id,
@@ -45,7 +52,7 @@ def enrich_finding_offline(
         owasp=owasp_entries(finding.owasp),
         remediation=formatted["remediation"],
         detection_summary=_summarize_layers(layers),
-        analysis_mode="offline",
+        analysis_mode="cloud",
     )
 
 
@@ -54,23 +61,21 @@ async def enrich_finding(
     result: ProbeResult,
     config: AppConfig,
 ) -> EnrichmentResult:
-    offline = enrich_finding_offline(finding, result, config)
-    if config.detection.analysis_mode != "cloud" or not config.detection.agentic.enabled:
-        return offline
+    base = enrich_finding_base(finding, result, config)
 
     api_key = config.detection.agentic.api_key or ""
     if not api_key:
-        offline.agentic_fallback = True
-        return offline
+        base.agentic_fallback = True
+        return base
 
     try:
         from agentarmor.detection.agentic.coordinator import enrich_finding_agentic
 
-        cloud = await enrich_finding_agentic(finding, result, config, offline_base=offline)
+        cloud = await enrich_finding_agentic(finding, result, config, base_enrichment=base)
         return cloud
     except Exception:
-        offline.agentic_fallback = True
-        return offline
+        base.agentic_fallback = True
+        return base
 
 
 def _summarize_layers(layers: dict[str, Any]) -> dict[str, str]:

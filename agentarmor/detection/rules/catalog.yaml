@@ -1,13 +1,20 @@
-# Unified detection rule catalog (Sprint 3)
-version: "2026.06.1"
+# Unified detection rule catalog
+# Single source of truth for the Python L1 fallback, the Rust native L1 engine
+# (embedded at compile time via include_str!), the L2 heuristic fallback, and the
+# L4 outcome layer. Every rule may carry OWASP LLM Top 10 ids and a CWE id so
+# findings can be explained accurately and mapped to a standard.
+version: "2026.07.1"
 
 rules:
+  # ---------------------------------------------------------------- jailbreak
   - name: ignore_instructions
     pattern: '(?i)ignore\s+(all\s+)?(previous|prior)\s+instructions'
     category: jailbreak
     l1_weight: 0.85
     l2_class: prompt_injection
     l2_weight: 0.9
+    owasp: [LLM01]
+    cwe: CWE-1427
 
   - name: disregard_prompt
     pattern: '(?i)disregard\s+(your\s+)?(system\s+)?prompt'
@@ -15,6 +22,8 @@ rules:
     l1_weight: 0.85
     l2_class: prompt_injection
     l2_weight: 0.85
+    owasp: [LLM01]
+    cwe: CWE-1427
 
   - name: developer_mode
     pattern: '(?i)you\s+are\s+now\s+(in\s+)?(developer|admin|root)\s+mode'
@@ -22,6 +31,8 @@ rules:
     l1_weight: 0.80
     l2_class: jailbreak
     l2_weight: 0.85
+    owasp: [LLM01]
+    cwe: CWE-1427
 
   - name: dan_jailbreak
     pattern: '(?i)do\s+anything\s+now|\bDAN\b'
@@ -29,6 +40,8 @@ rules:
     l1_weight: 0.90
     l2_class: jailbreak
     l2_weight: 0.92
+    owasp: [LLM01]
+    cwe: CWE-1427
 
   - name: system_prompt_leak
     pattern: '(?i)system\s*prompt\s*(is|:)'
@@ -37,6 +50,8 @@ rules:
     l2_class: data_leakage
     l2_weight: 0.85
     outcome_weight: 0.85
+    owasp: [LLM07]
+    cwe: CWE-200
 
   - name: my_system_prompt
     pattern: '(?i)my\s+system\s+prompt\s+is'
@@ -44,11 +59,15 @@ rules:
     l1_weight: 0.80
     l2_class: data_leakage
     l2_weight: 0.88
+    owasp: [LLM07]
+    cwe: CWE-200
 
   - name: instructions_are
     pattern: '(?i)my\s+instructions\s+are'
     category: prompt_leakage
     l1_weight: 0.75
+    owasp: [LLM07]
+    cwe: CWE-200
 
   - name: hidden_rules
     pattern: '(?i)hidden\s+rules?'
@@ -56,11 +75,15 @@ rules:
     l1_weight: 0.70
     l2_class: data_leakage
     l2_weight: 0.8
+    owasp: [LLM07]
+    cwe: CWE-200
 
   - name: begin_system
     pattern: '(?i)BEGIN\s+SYSTEM'
     category: system_exposure
     l1_weight: 0.80
+    owasp: [LLM07]
+    cwe: CWE-200
 
   - name: refusal_bypass
     pattern: '(?i)(without\s+restrictions|no\s+ethical\s+guidelines|uncensored)'
@@ -68,28 +91,38 @@ rules:
     l1_weight: 0.65
     l2_class: jailbreak
     l2_weight: 0.85
+    owasp: [LLM01]
+    cwe: CWE-1427
 
   - name: secret_exposure
     pattern: '(?i)here\s+is\s+(the\s+)?(secret|password|api[_\s]?key)'
     category: prompt_leakage
     l1_weight: 0.70
+    owasp: [LLM02]
+    cwe: CWE-200
 
   - name: admin_discount
     pattern: '(?i)admin\s*(discount|code|coupon)'
     category: policy_bypass
     l1_weight: 0.85
     outcome_weight: 0.9
+    owasp: [LLM06]
+    cwe: CWE-840
 
   - name: coupon_token
     pattern: '(?i)\b[A-Z]{4,}\d{2,}OFF\b'
     category: policy_bypass
     l1_weight: 0.85
     outcome_weight: 0.85
+    owasp: [LLM06]
+    cwe: CWE-840
 
   - name: discount_revealed
     pattern: '(?i)discount\s*(code\s*)?(revealed|applied)'
     category: policy_bypass
     outcome_weight: 0.85
+    owasp: [LLM06]
+    cwe: CWE-840
 
   - name: secret_leak
     pattern: '(?i)(api[_\s-]?key|password|secret)\s*[:=]\s*\S+'
@@ -97,31 +130,229 @@ rules:
     l2_class: unsafe_output
     l2_weight: 0.75
     outcome_weight: 0.9
+    owasp: [LLM02]
+    cwe: CWE-522
 
   - name: privileged_pricing
     pattern: '(?i)(90|99)\s*%\s*off'
     category: policy_bypass
     outcome_weight: 0.8
+    owasp: [LLM06]
+    cwe: CWE-840
 
   - name: policy_disclosure
     pattern: '(?i)you\s+are\s+a\s+.+\s+assistant'
     category: prompt_leakage
     outcome_weight: 0.75
+    owasp: [LLM07]
+    cwe: CWE-200
 
   - name: tool_abuse
     pattern: '(?i)tool\s*call|invoke\s+tool|delete_all'
     category: tool_abuse
     l2_class: tool_abuse
     l2_weight: 0.8
+    owasp: [LLM06]
+    cwe: CWE-250
 
   - name: bypass_filter
     pattern: '(?i)bypass\s+(content\s+)?filter'
     category: unsafe_output
     l2_class: unsafe_output
     l2_weight: 0.7
+    owasp: [LLM01]
+    cwe: CWE-1427
 
   - name: developer_mode_phrase
     pattern: '(?i)developer\s+mode|no\s+restrictions'
     category: jailbreak
     l2_class: jailbreak
     l2_weight: 0.85
+    owasp: [LLM01]
+    cwe: CWE-1427
+
+  # -------------------------------------------- system-prompt extraction (new)
+  - name: repeat_system_prompt
+    pattern: '(?i)(repeat|print|output|show|reveal|display|tell\s+me)\s+(your\s+|the\s+)?(system\s+prompt|initial\s+instructions|instructions\s+above|text\s+above)'
+    category: prompt_leakage
+    l1_weight: 0.82
+    l2_class: data_leakage
+    l2_weight: 0.85
+    owasp: [LLM07, LLM01]
+    cwe: CWE-200
+
+  - name: repeat_verbatim_above
+    pattern: '(?i)repeat\s+(the\s+)?(text|words|everything)\s+above\s+verbatim'
+    category: prompt_leakage
+    l1_weight: 0.80
+    owasp: [LLM07]
+    cwe: CWE-200
+
+  # ------------------------------------------ roleplay / virtualization (new)
+  - name: roleplay_pretend
+    pattern: '(?i)(pretend|imagine)\s+(that\s+)?you\s+are\s+(an?\s+)?(unrestricted|uncensored|evil|jailbroken|amoral)'
+    category: jailbreak
+    l1_weight: 0.80
+    l2_class: jailbreak
+    l2_weight: 0.85
+    owasp: [LLM01]
+    cwe: CWE-1427
+
+  - name: hypothetical_framing
+    pattern: '(?i)(in\s+a\s+(fictional|hypothetical)\s+(story|world|scenario|setting))|(hypothetically\s+speaking)'
+    category: jailbreak
+    l1_weight: 0.62
+    l2_class: jailbreak
+    l2_weight: 0.7
+    owasp: [LLM01]
+    cwe: CWE-1427
+
+  - name: grandma_exploit
+    pattern: '(?i)(my\s+)?(late|deceased|dead)\s+grandm(a|other)|grandm(a|other)\s+used\s+to\s+(tell|read|whisper|sing)'
+    category: jailbreak
+    l1_weight: 0.78
+    l2_class: jailbreak
+    l2_weight: 0.8
+    owasp: [LLM01]
+    cwe: CWE-1427
+
+  - name: aim_machiavellian
+    pattern: '(?i)always\s+intelligent\s+and\s+machiavellian|\bAIM\b\s+(will|would|is|chatbot)|niccolo\s+machiavelli'
+    category: jailbreak
+    l1_weight: 0.80
+    l2_class: jailbreak
+    l2_weight: 0.85
+    owasp: [LLM01]
+    cwe: CWE-1427
+
+  - name: do_not_refuse
+    pattern: '(?i)(do\s+not|don''t|never)\s+(refuse|decline|apolog(ize|ise)|say\s+you\s+can''?t|break\s+character)'
+    category: jailbreak
+    l1_weight: 0.70
+    l2_class: jailbreak
+    l2_weight: 0.78
+    owasp: [LLM01]
+    cwe: CWE-1427
+
+  # ------------------------------------------------- encoding / obfuscation (new)
+  - name: base64_decode_instruction
+    pattern: '(?i)decode\s+(the\s+)?(following\s+|this\s+)?base64.*(and|then)?\s*(execute|run|follow|do|reply)?'
+    category: jailbreak
+    l1_weight: 0.72
+    l2_class: prompt_injection
+    l2_weight: 0.78
+    owasp: [LLM01]
+    cwe: CWE-1427
+
+  - name: rot13_instruction
+    pattern: '(?i)(decode|decrypt)\s+(the\s+)?(following\s+|this\s+)?rot13'
+    category: jailbreak
+    l1_weight: 0.70
+    l2_class: prompt_injection
+    l2_weight: 0.75
+    owasp: [LLM01]
+    cwe: CWE-1427
+
+  - name: payload_splitting
+    pattern: '(?i)(concatenate|combine|join|merge)\s+(these|the\s+following|the\s+next)\s+(letters|parts|strings|words|tokens)'
+    category: jailbreak
+    l1_weight: 0.68
+    l2_class: prompt_injection
+    l2_weight: 0.72
+    owasp: [LLM01]
+    cwe: CWE-1427
+
+  - name: leetspeak_ignore
+    pattern: '(?i)1gn0r3|1nstruct10ns|pr3v10us|d0\s+anyth1ng'
+    category: jailbreak
+    l1_weight: 0.66
+    owasp: [LLM01]
+    cwe: CWE-1427
+
+  # ---------------------------------------------- indirect / RAG injection (new)
+  - name: indirect_injection_marker
+    pattern: '(?i)(important|note|system|admin)\s*[:\-]?\s*(ignore|disregard|forget)\s+(the\s+)?(above|previous|prior|user|earlier)'
+    category: jailbreak
+    l1_weight: 0.80
+    l2_class: prompt_injection
+    l2_weight: 0.85
+    owasp: [LLM01]
+    cwe: CWE-1427
+
+  - name: injected_new_instructions
+    pattern: '(?i)(new|updated)\s+(instructions|directive|task)\s*[:\-]'
+    category: jailbreak
+    l1_weight: 0.58
+    l2_class: prompt_injection
+    l2_weight: 0.65
+    owasp: [LLM01]
+    cwe: CWE-1427
+
+  # -------------------------------------------------- data exfiltration (new)
+  - name: data_exfil_to_url
+    pattern: '(?i)(send|post|exfiltrate|upload|forward|leak)\s+.{0,40}?(to\s+)?https?://'
+    category: unsafe_output
+    l2_class: unsafe_output
+    l2_weight: 0.78
+    outcome_weight: 0.85
+    owasp: [LLM02, LLM06]
+    cwe: CWE-201
+
+  - name: markdown_image_exfil
+    pattern: '(?i)!\[[^\]]*\]\(https?://[^)]*\?[^)]*=[^)]*\)'
+    category: unsafe_output
+    outcome_weight: 0.82
+    owasp: [LLM02, LLM05]
+    cwe: CWE-201
+
+  - name: private_key_leak
+    pattern: '-----BEGIN\s+(RSA\s+|EC\s+|DSA\s+|OPENSSH\s+)?PRIVATE\s+KEY-----'
+    category: prompt_leakage
+    outcome_weight: 0.95
+    owasp: [LLM02]
+    cwe: CWE-522
+
+  - name: env_var_leak
+    pattern: '(?i)(print|echo|show|reveal|dump|list)\s+.{0,20}?(env(ironment)?\s+(var|variable)|process\.env|os\.environ)'
+    category: prompt_leakage
+    l1_weight: 0.60
+    outcome_weight: 0.7
+    owasp: [LLM02]
+    cwe: CWE-200
+
+  # --------------------------------------------------- MCP / tool abuse (new)
+  - name: mcp_tool_poisoning
+    pattern: '(?i)(<important>|hidden\s+instruction|do\s+not\s+(tell|mention|reveal)\s+(the\s+)?user|before\s+using\s+this\s+tool)'
+    category: tool_abuse
+    l1_weight: 0.72
+    l2_class: tool_abuse
+    l2_weight: 0.8
+    owasp: [LLM01, LLM06]
+    cwe: CWE-1427
+
+  - name: mcp_ignore_tool_schema
+    pattern: '(?i)ignore\s+(the\s+)?(tool|function)\s+(description|schema|definition)'
+    category: tool_abuse
+    l1_weight: 0.68
+    l2_class: tool_abuse
+    l2_weight: 0.75
+    owasp: [LLM06]
+    cwe: CWE-250
+
+  - name: cross_server_confused_deputy
+    pattern: '(?i)(call|invoke|use)\s+.{0,30}?(other|another|different)\s+(server|tool|agent)\s+.{0,30}?(with|using)\s+(my|the)\s+(credential|token|api[_\s]?key|secret)'
+    category: tool_abuse
+    l1_weight: 0.75
+    l2_class: tool_abuse
+    l2_weight: 0.8
+    owasp: [LLM06]
+    cwe: CWE-862
+
+  - name: excessive_permission
+    pattern: '(?i)(grant|give)\s+(me\s+)?(full|admin|root|elevated|all|complete|unrestricted)\s+(\w+\s+){0,2}(access|permission|privilege|control)'
+    category: tool_abuse
+    l1_weight: 0.70
+    l2_class: tool_abuse
+    l2_weight: 0.75
+    owasp: [LLM06]
+    cwe: CWE-250

@@ -23,6 +23,7 @@ from agentarmor.api.routes.targets import router as targets_router
 from agentarmor.api.routes.web_scans import router as web_scans_router
 from agentarmor.core.config import load_config
 from agentarmor.core.events import event_bus
+from agentarmor.engines.endpoint.pool import aclose_all
 from agentarmor.db.benchmark_session import BenchmarkRepository
 from agentarmor.db.monitor_session import MonitorRepository
 from agentarmor.db.session import ScanRepository
@@ -58,6 +59,7 @@ async def lifespan(app: FastAPI):
     yield
     if _scheduler:
         await _scheduler.stop()
+    await aclose_all()
 
 
 app = FastAPI(title="AgentArmor", version=__version__, lifespan=lifespan)

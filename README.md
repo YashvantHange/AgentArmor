@@ -288,4 +288,4 @@ powershell -File packaging/build-installer.ps1
 
 ## License
 
-See repository license file.
+AgentArmor is released under the [MIT License](LICENSE).

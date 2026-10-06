@@ -55,10 +55,76 @@ _INSTRUCTION_SHAPES = re.compile(
     re.IGNORECASE,
 )
 
+# The same shapes with every punctuation anchor removed, for matching against the
+# collapsed detection view below.
+_COLLAPSED_SHAPES = re.compile(
+    r"(ignore (all |any )?(previous|prior|above)"
+    r"|disregard (all |any )?(previous|prior|your)"
+    r"|forget (all |your )?(previous )?(instructions|rules)"
+    r"|new (system )?(prompt|instructions|instruction|rules|rule)"
+    r"|you are now"
+    r"|from now on you"
+    r"|act as (if|though) you"
+    r"|override (your|all|previous)"
+    # Deliberately no bare "system prompt" rule. It would quarantine genuine
+    # system-prompt disclosure, which is the most valuable fact a swarm can find
+    # and the reason that kind is protected from eviction. Catching an indirect
+    # "new ... system prompt: obey" is not worth withholding every real one, so
+    # only the adjacent "new system prompt" form is matched, in the squeezed view.
+    r")"
+)
+
+_NON_ALNUM = re.compile(r"[^a-z0-9]+")
+
+# Imperatives with no plausible reading as evidence about a target. Matched against
+# the fully squeezed view, where separators have been deleted rather than
+# collapsed, so letter-spacing and joined words cannot hide them.
+_SQUEEZED_SHAPES = re.compile(
+    r"(ignore(all|any)?(previous|prior|above)"
+    r"|disregard(all|any)?(previous|prior|your)"
+    r"|forget(all|your)?(previous)?(instructions|rules)"
+    r"|youarenow"
+    r"|fromnowonyou"
+    r"|override(your|all|previous)"
+    r"|new(system)?(prompt|instructions?|rules?)[:=]?)"
+)
+
+
+def _collapsed_view(value: str) -> str:
+    """Lowercase words, punctuation collapsed to single spaces."""
+    return _NON_ALNUM.sub(" ", value.lower()).strip()
+
+
+def _squeezed_view(value: str) -> str:
+    """Lowercase alphanumerics only.
+
+    Defeats separator tricks - ``I.g.n.o.r.e``, a stripped zero-width that joins
+    two words into ``ignoreall`` - which survive the collapsed view because they
+    change word boundaries rather than characters.
+    """
+    return _NON_ALNUM.sub("", value.lower())
+
 
 def looks_like_instruction(value: str) -> bool:
-    """True when a captured value reads as a directive rather than evidence."""
-    return bool(_INSTRUCTION_SHAPES.search(value))
+    """True when a captured value reads as a directive rather than as evidence.
+
+    Three views are checked because normalisation is where this kind of check gets
+    evaded: the literal value, a punctuation-collapsed view, and a fully squeezed
+    view. Quarantining if any of them matches means over-quarantining is possible,
+    which is the safe direction - the fact is still reported, it is only withheld
+    from other members' prompts.
+
+    This is **layer two**. The primary control is the untrusted envelope and the
+    system-prompt notice in ``redteam.untrusted``: a value that reaches a member is
+    still fenced and labelled as data. Quarantine removes the cheap and obvious
+    injections; it is not a complete filter, and a sufficiently indirect phrasing
+    will pass it. Treat a miss here as degrading to the envelope, not as a breach.
+    """
+    if _INSTRUCTION_SHAPES.search(value):
+        return True
+    if _COLLAPSED_SHAPES.search(_collapsed_view(value)):
+        return True
+    return bool(_SQUEEZED_SHAPES.search(_squeezed_view(value)))
 
 
 def _score(fact: Fact) -> float:

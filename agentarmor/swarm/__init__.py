@@ -7,6 +7,8 @@ other mid-run while staying target-rate-limited, budget-limited, cancellable and
 reproducible.
 """
 
+from agentarmor.swarm.blackboard import Blackboard, looks_like_instruction
+from agentarmor.swarm.facts import extract_facts
 from agentarmor.swarm.goals import (
     get_swarm_goal,
     list_swarm_goal_ids,
@@ -24,6 +26,7 @@ from agentarmor.swarm.schemas import (
 )
 
 __all__ = [
+    "Blackboard",
     "Fact",
     "MemberRecord",
     "PERSONA_LIBRARY",
@@ -33,8 +36,10 @@ __all__ = [
     "SwarmMember",
     "SwarmSummary",
     "SwarmTrace",
+    "extract_facts",
     "get_persona",
     "get_swarm_goal",
     "list_swarm_goal_ids",
     "list_swarm_goals",
+    "looks_like_instruction",
 ]

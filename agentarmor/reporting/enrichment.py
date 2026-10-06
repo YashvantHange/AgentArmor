@@ -13,6 +13,7 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 from agentarmor.core.config import AppConfig
+from agentarmor.core.metering import UsageMeter
 from agentarmor.core.models import Finding, ProbeResult
 from agentarmor.knowledge.issue_catalog import format_entry
 from agentarmor.knowledge.owasp_llm import owasp_entries
@@ -60,7 +61,14 @@ async def enrich_finding(
     finding: Finding,
     result: ProbeResult,
     config: AppConfig,
+    meter: UsageMeter | None = None,
 ) -> EnrichmentResult:
+    """Enrich a finding, optionally reporting the analysis spend.
+
+    ``meter`` defaults to None, the historical behaviour: this pipeline has never
+    reported what it costs. A swarm passes one so enrichment counts against the
+    same ceiling as member calls.
+    """
     base = enrich_finding_base(finding, result, config)
 
     api_key = config.detection.agentic.api_key or ""
@@ -71,7 +79,9 @@ async def enrich_finding(
     try:
         from agentarmor.detection.agentic.coordinator import enrich_finding_agentic
 
-        cloud = await enrich_finding_agentic(finding, result, config, base_enrichment=base)
+        cloud = await enrich_finding_agentic(
+            finding, result, config, base_enrichment=base, meter=meter
+        )
         return cloud
     except Exception:
         base.agentic_fallback = True

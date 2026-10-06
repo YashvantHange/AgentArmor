@@ -16,7 +16,7 @@ from agentarmor.core.config import AppConfig
 _log = logging.getLogger(__name__)
 
 
-def _is_auth_error(exc: Exception) -> bool:
+def is_auth_error(exc: Exception) -> bool:
     """True when the exception clearly means the key was rejected (401/403)."""
     name = exc.__class__.__name__.lower()
     if "authentication" in name or "permissiondenied" in name:
@@ -29,6 +29,10 @@ def _is_auth_error(exc: Exception) -> bool:
         pass
     text = str(exc).lower()
     return "authenticationerror" in text or "incorrect api key" in text or "invalid api key" in text
+
+
+# Retained so existing imports of the private name keep working.
+_is_auth_error = is_auth_error
 
 
 async def validate_analysis_key(config: AppConfig) -> None:
@@ -56,7 +60,7 @@ async def validate_analysis_key(config: AppConfig) -> None:
             temperature=0.0,
         )
     except Exception as exc:  # noqa: BLE001 - classify then re-raise or warn
-        if _is_auth_error(exc):
+        if is_auth_error(exc):
             raise ValueError(
                 f"Analysis API key was rejected by the provider ({agentic.provider}). "
                 "The scan needs a valid analysis key to run its multi-agent analysis. "

@@ -20,6 +20,17 @@ export function ShieldIcon(props: IconProps) {
   );
 }
 
+export function SwarmIcon(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <circle cx="12" cy="5" r="2.2" />
+      <circle cx="5" cy="17" r="2.2" />
+      <circle cx="19" cy="17" r="2.2" />
+      <path d="M12 7.2 6.6 14.8M12 7.2l5.4 7.6M7.2 17h9.6" />
+    </svg>
+  );
+}
+
 export function GlobeIcon(props: IconProps) {
   return (
     <svg {...base} {...props}>

@@ -13,6 +13,7 @@ import uvicorn
 from agentarmor.cli.gate import gate_main
 from agentarmor.cli.benchmark import benchmark_app
 from agentarmor.cli.ecosystem import dataset_app, marketplace_app, monitor_app
+from agentarmor.cli.swarm import swarm_app
 from agentarmor.core.config import apply_analysis_options, ensure_analysis_ready, load_config, merge_cli_target
 from agentarmor.db.models import init_db
 
@@ -26,6 +27,7 @@ app.add_typer(benchmark_app, name="benchmark")
 app.add_typer(marketplace_app, name="marketplace")
 app.add_typer(monitor_app, name="monitor")
 app.add_typer(dataset_app, name="dataset")
+app.add_typer(swarm_app, name="swarm")
 
 eval_app = typer.Typer(help="Detection evaluation")
 app.add_typer(eval_app, name="eval")

@@ -5,7 +5,43 @@ on:
   pull_request:
 
 jobs:
+  # Every scan has required an analysis API key since v1.4.0 removed the offline
+  # mode, so this workflow failed on every run: the scan exited 1, findings.sarif
+  # was never written, and the upload and gate steps failed after it.
+  #
+  # Secrets cannot be referenced in a job-level `if`, so the key check runs in its
+  # own job and publishes the answer as an output.
+  check-key:
+    runs-on: ubuntu-latest
+    outputs:
+      has_key: ${{ steps.check.outputs.has_key }}
+    steps:
+      - id: check
+        env:
+          ANALYSIS_KEY: ${{ secrets.AGENTARMOR_ANALYSIS_API_KEY }}
+        run: |
+          if [ -n "$ANALYSIS_KEY" ]; then
+            echo "has_key=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_key=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  skipped:
+    needs: check-key
+    if: needs.check-key.outputs.has_key != 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Explain the skip
+        run: |
+          echo "Self-scan skipped: no AGENTARMOR_ANALYSIS_API_KEY secret is set."
+          echo "Multi-agent analysis runs on every scan since v1.4.0, so a scan"
+          echo "cannot run without an analysis provider key."
+          echo "To enable it: Settings > Secrets and variables > Actions, then add a"
+          echo "repository secret named AGENTARMOR_ANALYSIS_API_KEY."
+
   agentarmor:
+    needs: check-key
+    if: needs.check-key.outputs.has_key == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -27,10 +63,16 @@ jobs:
                   time.sleep(0.3)
           open('.mock_pid','w').write(str(p.pid))
           "
-      - run: agentarmor scan --url http://127.0.0.1:8000/v1/chat/completions --format sarif -o findings.sarif
+      - name: Run scan
+        env:
+          AGENTARMOR_ANALYSIS_API_KEY: ${{ secrets.AGENTARMOR_ANALYSIS_API_KEY }}
+        run: agentarmor scan --url http://127.0.0.1:8000/v1/chat/completions --format sarif -o findings.sarif
+      # Only upload when the scan actually produced a report. Unconditional
+      # `if: always()` made a missing SARIF a second, misleading failure.
       - uses: github/codeql-action/upload-sarif@v3
-        if: always()
+        if: hashFiles('findings.sarif') != ''
         with:
           sarif_file: findings.sarif
-      - run: agentarmor gate --sarif findings.sarif --fail-on HIGH,CRITICAL
+      - name: Gate on severity
         if: always()
+        run: agentarmor gate --sarif findings.sarif --fail-on HIGH,CRITICAL

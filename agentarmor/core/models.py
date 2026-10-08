@@ -132,6 +132,10 @@ class ScanStatus(str, Enum):
     RUNNING = "running"
     COMPLETED = "completed"
     FAILED = "failed"
+    # A run stopped on request, keeping whatever it had already produced. The GUI
+    # has always listed "cancelled" as terminal; nothing emitted it until swarms,
+    # which are the first runs large enough that stopping one is a real need.
+    CANCELLED = "cancelled"
 
 
 class Scan(BaseModel):

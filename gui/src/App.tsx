@@ -11,6 +11,8 @@ import Monitoring from "./pages/Monitoring";
 import Reports from "./pages/Reports";
 import ScanConfig from "./pages/ScanConfig";
 import ScanProgress from "./pages/ScanProgress";
+import SwarmLaunch from "./pages/SwarmLaunch";
+import SwarmProgress from "./pages/SwarmProgress";
 import SettingsPage from "./pages/Settings";
 import ChatbotWizard from "./pages/chatbot/ChatbotWizard";
 import WebScanWizard from "./pages/chatbot/WebScanWizard";
@@ -73,6 +75,8 @@ export default function App() {
         <Route path="/chatbot" element={<ChatbotWizard />} />
         <Route path="/chatbot/website" element={<WebScanWizard />} />
         <Route path="/scan/:type" element={<ScanConfig />} />
+        <Route path="/swarm" element={<SwarmLaunch />} />
+        <Route path="/swarm/progress/:scanId" element={<SwarmProgress />} />
         <Route path="/progress/:scanId" element={<ScanProgress />} />
         <Route path="/findings/:scanId" element={<Findings />} />
         <Route path="/reports/:scanId" element={<Reports />} />

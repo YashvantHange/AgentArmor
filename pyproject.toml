@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "agentarmor"
-version = "1.4.3"
+dynamic = ["version"]
 description = "AI security scanner & red-teaming platform — test LLM APIs, agents, MCP servers, and RAG for prompt injection, jailbreaks, and OWASP LLM Top 10 risks."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -85,6 +85,13 @@ dev = [
 
 [project.scripts]
 agentarmor = "agentarmor.cli.main:app"
+
+# The package version is read from agentarmor/__init__.py rather than written
+# here. Two independent version strings with one release checklist is what let
+# them drift: the checklist omitted __init__.py, so 1.4.1 through 1.4.3 all
+# shipped reporting 1.4.0 in /health, the GUI status pill and every PDF report.
+[tool.hatch.version]
+path = "agentarmor/__init__.py"
 
 [tool.hatch.build.targets.wheel]
 packages = ["agentarmor"]

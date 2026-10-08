@@ -7,9 +7,89 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Planned — multi-agentic engine (fast-follows)
-- Cross-round memory / fact carry-over so a secret leaked on one node feeds later nodes
 - Critic/ensemble judge (independent second opinion in the uncertain band)
 - Unified finding clustering for the webscan→redteam escalation path
+
+## [1.5.0] - 2026-10-08
+
+### Added — agent swarm
+- **One-button swarms.** Pick a preset goal, choose a roster size and a concurrency
+  cap, and press **Launch swarm**. Many specialized agents pursue the same goal
+  together and the run reports as a single scan, with the usual JSON/SARIF/HTML/PDF/CSV
+  exports, findings list and live event stream.
+- **Shared blackboard.** Every agent reads and writes one deduplicated fact store, so
+  a secret, system-prompt fragment, tool name or refusal pattern found by one agent
+  immediately informs every agent that starts after it. This is the cross-round fact
+  carry-over that has been on the roadmap since 1.4.0. Facts are capped, ranked by
+  corroboration across agents, and persisted into the report.
+- **Untrusted-content handling.** Facts are text captured from the target, so they are
+  sanitized when stored and always shown to an agent inside a labelled untrusted
+  envelope, with the system prompt stating they are evidence and never instructions.
+  Values shaped like an instruction are kept for the report but withheld from other
+  agents. The same envelope now wraps the existing `last_response` field, which has
+  always carried target text into the next agent's prompt.
+- **Bounded by design.** Agents run in a worker pool sized to `swarm.max_concurrent`
+  (default 8, maximum 16) — never the full roster at once. A reservation-based budget
+  closes the overshoot window that a check-then-await leaves open under concurrency,
+  and finding enrichment is now metered against the same ceiling instead of spending
+  outside it. Per-agent token and cost attribution is reported for the first time.
+- **Cancellation.** `POST /v1/swarms/{id}/cancel` stops a running swarm and keeps the
+  partial trace, shared facts and findings. New terminal scan status `cancelled`.
+- **Honest coverage reporting.** Every surface shows what a roster actually spans —
+  agents, attack paths, personas, strategies, concurrency — rather than an agent count
+  alone, because a large roster against a shallow target is mostly persona and
+  strategy variation rather than that many distinct attack classes.
+- **New surfaces.** `GET /v1/swarms/goals`, `POST /v1/swarms`, `GET /v1/swarms/{id}`,
+  `POST /v1/swarms/{id}/cancel`; `agentarmor swarm goals` and `agentarmor swarm run`;
+  and a **Swarm** page in the desktop app with live per-agent status and a blackboard
+  panel. Swarm runs reuse the existing scan event stream, findings endpoint and report
+  downloads rather than duplicating them.
+
+### Fixed — target rate limiting
+- **`engine.endpoint.rate_limit_rps` never throttled anything.** `EndpointClient` was
+  rebuilt for every probe, so each probe got a fresh rate limiter starting from zero
+  and the configured limit had no effect across probes. Clients are now pooled per
+  target and per event loop, so the limit is enforced for **every** scan kind. The
+  pooled client also reuses one HTTP connection and runs endpoint auto-detection once
+  per target instead of once per probe. Auto-detect caches its outcome rather than a
+  flag, so a failed detection keeps failing instead of letting later probes through
+  with an unresolved profile.
+- The pooled client's cookie jar is cleared per probe. Pooling would otherwise replay
+  one probe's session cookie on the next, including probes from a later scan against
+  the same target — which for a tool that tests authentication boundaries can make a
+  probe appear authenticated because an earlier one was.
+
+### Fixed — LLM call resilience
+- **Red-team LLM calls now have a timeout and bounded retries.** `completion_json`
+  honours `detection.agentic.timeout_s`, a setting that already existed and was never
+  applied, so a hung provider call no longer stalls a scan indefinitely. Transient
+  failures (429, 408, 5xx, connection resets, timeouts) are retried with jittered
+  backoff under a concurrency cap; authentication errors, malformed requests and
+  context-length failures are never retried. A timed-out attempt is charged to the
+  budget, because the provider may have billed it.
+
+### Fixed — CI gate
+- **`agentarmor gate` no longer crashes on a missing or malformed SARIF file.** It
+  prints a clear message and exits `2` — "the gate could not run" — keeping exit `1`
+  for "findings at or above the threshold" so a pipeline can tell the two apart.
+
+### Fixed — release hygiene
+- **`agentarmor.__version__` was stuck at `1.4.0` for three releases**, stamping the
+  wrong version into `/health`, the FastAPI title, the desktop status pill and every
+  HTML and PDF report. The package version is now derived from
+  `agentarmor/__init__.py`, so the two cannot drift again, and a test asserts every
+  remaining copy agrees.
+- **Release notes are generated from this changelog.** `docs/RELEASE_BODY.md` had
+  shipped v1.4.0 notes as the body of v1.4.1, v1.4.2 and v1.4.3, telling users to
+  download installer files that did not exist in those releases. The file is removed
+  and the release workflow extracts the section for the tag being built, failing the
+  release if it is missing.
+- The self-scan workflow skips with an explanation when no analysis key is configured,
+  instead of failing on every run as it has since v1.4.0 made the key mandatory.
+
+### Added — licensing
+- **`LICENSE`** (MIT) is present in the repository and in the published wheel, matching
+  the `license = "MIT"` declaration and the README badge.
 
 ## [1.4.3] - 2026-07-10
 

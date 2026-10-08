@@ -455,3 +455,95 @@ def test_count_scans_since_filters_by_kind(tmp_path):
 
 def test_cancelled_status_is_a_terminal_scan_status():
     assert ScanStatus.CANCELLED.value == "cancelled"
+
+
+# --- security regressions ---------------------------------------------------
+
+
+def test_the_request_cannot_choose_its_own_config_file():
+    """config_path would have been a complete bypass of every swarm limit.
+
+    The configuration file supplies max_agents, max_concurrent,
+    max_swarms_per_day, max_concurrent_swarms and the budget ceiling. A request
+    that picks the file picks its own ceilings, so apply_swarm_options and
+    _enforce_swarm_limits would both read attacker-supplied values.
+    """
+    fields = set(swarms_route.SwarmCreateRequest.model_fields)
+    for forbidden in ("config_path", "config", "config_file", "settings_path"):
+        assert forbidden not in fields
+
+
+def test_an_unexpected_config_field_is_not_silently_accepted():
+    """Pydantic ignores unknown keys by default, so assert it changes nothing."""
+    body = swarms_route.SwarmCreateRequest(
+        goal_id="extract_system_prompt",
+        url="http://target.test/v1/chat",
+        config_path="/etc/evil.toml",  # type: ignore[call-arg]
+    )
+    assert not hasattr(body, "config_path")
+
+
+def test_limits_come_from_the_server_config_not_the_request(client):
+    """Asking for more than the server allows yields the server's number."""
+    test_client, _repo, _launched = client
+    data = test_client.post(
+        "/v1/swarms",
+        json=_body(agents=99999, max_concurrent=99999, max_tokens=10**9, max_cost_usd=1e6),
+    ).json()
+    assert data["agents"] == 100
+    assert data["max_concurrent"] == 16
+
+
+def test_the_scan_record_never_stores_the_target_credential(tmp_path):
+    """Why a bearer token cannot reach the swarm endpoints today.
+
+    ScanRecord has no headers column and get_scan rebuilds Target from type and url
+    alone, so the credential is dropped at the persistence boundary. A security
+    review flagged the response shape as a credential leak; it is not exploitable
+    for this reason, and this test is what keeps that true.
+    """
+    from agentarmor.core.models import Target, TargetType
+
+    repo = ScanRepository(f"sqlite:///{tmp_path / 'creds.db'}")
+    repo.ensure_schema()
+    scan = Scan(
+        target=Target(
+            type=TargetType.ENDPOINT,
+            url="http://target.test/v1/chat",
+            headers={"Authorization": "Bearer super-secret-token"},
+        )
+    )
+    scan.metadata["scan_kind"] = "swarm"
+    repo.save_scan(scan)
+
+    restored = repo.get_scan(scan.id)
+    assert restored is not None
+    assert restored.target.headers == {}
+
+
+def test_the_endpoint_redacts_a_credential_if_one_is_ever_present(client, monkeypatch):
+    """Insurance, not a live fix.
+
+    Headers are dropped by persistence today, so this guard is unreachable through
+    the database. It exists so that if get_scan ever starts restoring them, this
+    unauthenticated and CORS-open endpoint does not quietly begin handing the
+    bearer token to any page the user visits.
+    """
+    test_client, repo, _launched = client
+    from agentarmor.core.models import Target, TargetType
+
+    scan = Scan(
+        target=Target(
+            type=TargetType.ENDPOINT,
+            url="http://target.test/v1/chat",
+            headers={"Authorization": "Bearer super-secret-token"},
+        )
+    )
+    scan.metadata["scan_kind"] = "swarm"
+    monkeypatch.setattr(swarms_route._repo, "get_scan", lambda _id: scan)
+
+    body = test_client.get(f"/v1/swarms/{scan.id}").text
+    assert "super-secret-token" not in body
+    assert "[redacted]" in body
+    # The header name stays visible: useful for debugging, not sensitive.
+    assert "Authorization" in body

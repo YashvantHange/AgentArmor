@@ -59,7 +59,10 @@ async def test_endpoint_client_live_config(monkeypatch):
 
         class FakeAsyncClient:
             def __init__(self, *args, **kwargs):
-                pass
+                # A real AsyncClient always has a cookie jar, and the endpoint
+                # client clears it per probe so a pooled connection cannot replay
+                # one probe's session on the next. The double needs it too.
+                self.cookies = httpx_module.Cookies()
 
             async def __aenter__(self):
                 return self

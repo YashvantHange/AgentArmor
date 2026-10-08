@@ -152,15 +152,22 @@ def scan(
         formats = [f.strip() for f in fmt.split(",")]
 
     async def _run() -> None:
+        from agentarmor.engines.endpoint.pool import aclose_all
         from agentarmor.services.scan_service import execute_scan
 
-        completed, paths = await execute_scan(cfg, formats=formats, output_file=output)
-        typer.echo(f"Scan {completed.id} completed: {completed.finding_count} finding(s)")
-        health = (completed.metadata or {}).get("analysis_health") or {}
-        if health.get("cloud_ok") is False:
-            typer.echo(f"Warning: {health.get('message')}", err=True)
-        for p in paths:
-            typer.echo(f"  Report: {p}")
+        try:
+            completed, paths = await execute_scan(cfg, formats=formats, output_file=output)
+            typer.echo(f"Scan {completed.id} completed: {completed.finding_count} finding(s)")
+            health = (completed.metadata or {}).get("analysis_health") or {}
+            if health.get("cloud_ok") is False:
+                typer.echo(f"Warning: {health.get('message')}", err=True)
+            for p in paths:
+                typer.echo(f"  Report: {p}")
+        finally:
+            # One scan per CLI process, so closing here is safe. The API instead
+            # closes on shutdown: concurrent scans share a pooled client and
+            # must not have it closed from under them.
+            await aclose_all()
 
     asyncio.run(_run())
 

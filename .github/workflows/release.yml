@@ -10,7 +10,7 @@ on:
         # No default on purpose. A hardcoded tag goes stale the moment the next
         # release lands, and a manual re-run would then silently build an old
         # one. required: true makes the dispatch form demand the tag instead.
-        description: Release tag to build (e.g. v1.4.3)
+        description: Release tag to build (e.g. v1.5.0)
         required: true
 
 env:
@@ -74,11 +74,17 @@ jobs:
           path: release-assets
       - name: List assets
         run: ls -laR release-assets/
+      - name: Build release notes from the changelog
+        # Replaces a hand-maintained docs/RELEASE_BODY.md, which shipped v1.4.0 notes
+        # as the body of three later releases. This fails if the tag has no changelog
+        # section, so stale notes cannot be published silently.
+        run: python scripts/changelog_section.py "${{ env.RELEASE_TAG }}" > release-notes.md
+      - run: cat release-notes.md
       - uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ env.RELEASE_TAG }}
           name: AgentArmor ${{ env.RELEASE_TAG }}
-          body_path: docs/RELEASE_BODY.md
+          body_path: release-notes.md
           files: release-assets/*
           fail_on_unmatched_files: false
           overwrite: true

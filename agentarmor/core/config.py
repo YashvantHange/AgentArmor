@@ -288,6 +288,71 @@ class RedTeamConfig(BaseModel):
     budget: RedTeamBudgetConfig = Field(default_factory=RedTeamBudgetConfig)
 
 
+class SwarmBudgetConfig(RedTeamBudgetConfig):
+    """Swarm budget ceiling.
+
+    Subclasses the red-team budget so a ``BudgetGovernor`` accepts it unchanged,
+    with limits raised for a run that is many members wide instead of twelve
+    rounds deep. 100 members at roughly 1.2k generate + 1.5k judge tokens each is
+    about 270k, so 250k means a full-size swarm degrades near the end rather than
+    being cut off mid first wave; ``warn_at_pct`` then fires at 200k. The cost cap
+    is a circuit breaker for a misconfigured expensive model, not an expected
+    spend: 250k tokens on the default gpt-4o-mini is roughly $0.08.
+    """
+
+    max_tokens: int = 250_000
+    max_cost_usd: float = 10.0
+    warn_at_pct: float = 80.0
+
+
+class SwarmBlackboardConfig(BaseModel):
+    """Caps on the shared fact store.
+
+    Three independent limits keep a 100-member run from writing a megabyte of
+    scan metadata: per-fact length, total fact count, and the size of the brief
+    handed to each member. The brief sits beside the existing 800-char
+    ``last_response`` in a member's prompt, so generation input grows by at most
+    ~450 characters and the 500-char output cap is untouched.
+    """
+
+    max_facts: int = 200
+    max_fact_chars: int = 160
+    brief_max_chars: int = 400
+
+
+class SwarmConfig(BaseModel):
+    """Cooperative multi-agent swarm sizing and safety limits.
+
+    ``default_agents`` is deliberately well below ``max_agents``. A 100-member
+    swarm is roughly 5x the red-team token budget and, at the default
+    ``engine.endpoint.rate_limit_rps`` of 5, at least 20 seconds of pure target
+    throttling before any model latency. Defaulting to the ceiling would make the
+    common case the slowest and most expensive one.
+
+    ``max_concurrent`` caps how many members talk to the target at once; it is
+    never the roster size. Above 16 the endpoint rate limiter means extra
+    coroutines only park in ``RateLimiter.acquire``.
+    """
+
+    enabled: bool = True
+    default_agents: int = 24
+    max_agents: int = 100
+    default_concurrent: int = 8
+    max_concurrent: int = 16
+    max_findings_per_swarm: int = 20
+    persist_interval_s: float = 2.0
+    llm_max_concurrent: int = 8
+    llm_max_retries: int = 2
+    llm_timeout_s: float = 30.0
+    max_swarms_per_day: int = 5
+    max_concurrent_swarms: int = 1
+    # The lead agent's planning call is opt-in. The deterministic graph-ordered
+    # planner is the default path, so a swarm never depends on an LLM to start.
+    lead_llm_enabled: bool = False
+    blackboard: SwarmBlackboardConfig = Field(default_factory=SwarmBlackboardConfig)
+    budget: SwarmBudgetConfig = Field(default_factory=SwarmBudgetConfig)
+
+
 class AppConfig(BaseModel):
     target: Target = Field(default_factory=Target)
     engine_endpoint: EndpointEngineConfig = Field(default_factory=EndpointEngineConfig)
@@ -300,6 +365,7 @@ class AppConfig(BaseModel):
     reporting: ReportingConfig = Field(default_factory=ReportingConfig)
     webscan: WebScanConfig = Field(default_factory=WebScanConfig)
     redteam: RedTeamConfig = Field(default_factory=RedTeamConfig)
+    swarm: SwarmConfig = Field(default_factory=SwarmConfig)
     features: FeatureFlags = Field(default_factory=FeatureFlags)
     planner: PlannerConfig = Field(default_factory=PlannerConfig)
     database_url: str = "sqlite:///./agentarmor.db"
@@ -356,7 +422,21 @@ def load_config(path: Path | None = None) -> AppConfig:
         reporting=ReportingConfig(**raw.get("reporting", {})),
         webscan=_load_webscan_config(raw.get("webscan", {})),
         redteam=_load_redteam_config(raw.get("redteam", {})),
+        swarm=_load_swarm_config(raw.get("swarm", {})),
     )
+
+
+def _load_swarm_config(raw: object) -> SwarmConfig:
+    if not isinstance(raw, dict) or not raw:
+        return SwarmConfig()
+    data = dict(raw)
+    budget_raw = data.pop("budget", None)
+    blackboard_raw = data.pop("blackboard", None)
+    if isinstance(budget_raw, dict):
+        data["budget"] = SwarmBudgetConfig(**budget_raw)
+    if isinstance(blackboard_raw, dict):
+        data["blackboard"] = SwarmBlackboardConfig(**blackboard_raw)
+    return SwarmConfig(**data)
 
 
 def _load_webscan_config(raw: object) -> WebScanConfig:
@@ -550,6 +630,58 @@ def apply_multi_agent_redteam_options(
             if env_key:
                 config.detection.agentic.api_key = env_key
     return config
+
+
+# Absolute ceilings for swarm budget overrides. The existing apply_* helpers
+# clamp only the lower bound; for a swarm the upper bound is the safety property,
+# since the request arrives over an unauthenticated API.
+SWARM_MAX_TOKENS_CEILING = 1_000_000
+SWARM_MAX_COST_CEILING = 100.0
+
+
+def apply_swarm_options(
+    config: AppConfig,
+    *,
+    agents: int | None = None,
+    max_concurrent: int | None = None,
+    max_tokens: int | None = None,
+    max_cost_usd: float | None = None,
+) -> tuple[AppConfig, int, int]:
+    """Clamp swarm sizing on both ends and return the effective (agents, concurrency).
+
+    Returning the effective values rather than only mutating the config lets a
+    caller report what it actually ran, so a request for 500 agents can be
+    answered with "running 100" instead of silently doing something else.
+    """
+    sw = config.swarm
+
+    if agents is None:
+        effective_agents = sw.default_agents
+    else:
+        effective_agents = min(max(1, agents), sw.max_agents)
+
+    if max_concurrent is None:
+        effective_concurrent = sw.default_concurrent
+    else:
+        effective_concurrent = min(max(1, max_concurrent), sw.max_concurrent)
+    # Never start more workers than there are members to run.
+    effective_concurrent = min(effective_concurrent, effective_agents)
+
+    if max_tokens is not None:
+        sw.budget.max_tokens = min(max(1000, max_tokens), SWARM_MAX_TOKENS_CEILING)
+    if max_cost_usd is not None:
+        sw.budget.max_cost_usd = min(max(0.01, max_cost_usd), SWARM_MAX_COST_CEILING)
+
+    # A swarm always runs cloud multi-agent analysis, same as a multi-agent
+    # red-team scan; resolve the key from the environment if it was not passed.
+    config.detection.analysis_mode = "cloud"
+    config.detection.agentic.enabled = True
+    if not config.detection.agentic.api_key:
+        env_key = os.environ.get(config.detection.agentic.api_key_env, "")
+        if env_key:
+            config.detection.agentic.api_key = env_key
+
+    return config, effective_agents, effective_concurrent
 
 
 def apply_planner_options(

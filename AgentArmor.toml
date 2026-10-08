@@ -89,3 +89,28 @@ warn_at_pct = 80
 [redteam.multi_agent]
 max_rounds = 12
 stop_on_vulnerability = true
+
+[swarm]
+# Cooperative multi-agent swarm. default_agents is intentionally far below
+# max_agents: a full 100-member run is ~5x the red-team token budget and, at
+# engine.endpoint.rate_limit_rps = 5, at least 20s of pure target throttling.
+enabled = true
+default_agents = 24
+max_agents = 100
+default_concurrent = 8
+max_concurrent = 16
+max_swarms_per_day = 5
+max_concurrent_swarms = 1
+# The lead agent's planning call is opt-in; the deterministic graph-ordered
+# planner is the default path.
+lead_llm_enabled = false
+
+[swarm.budget]
+max_tokens = 250000
+max_cost_usd = 10.0
+warn_at_pct = 80.0
+
+[swarm.blackboard]
+max_facts = 200
+max_fact_chars = 160
+brief_max_chars = 400

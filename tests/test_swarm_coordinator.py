@@ -440,3 +440,23 @@ def test_cancelled_status_round_trips_through_the_database(tmp_path):
 def test_the_gui_terminal_status_set_now_matches_the_backend():
     """ScanProgress.tsx has always listed "cancelled"; nothing emitted it."""
     assert ScanStatus.CANCELLED.value == "cancelled"
+
+
+def test_skipped_members_are_not_reported_as_failures(swarm_env):
+    """A run whose first wave solved every node is a success, not N failures.
+
+    Found by an end-to-end run: 8 of 12 members were skipped because their node was
+    already solved, and the summary labelled all 8 "failed".
+    """
+    cfg, repo, state, _calls = swarm_env
+    state["vulnerable_nodes"].add("system_prompt_leak")
+    scan = _run(cfg, repo, _scan(cfg, agents=40, concurrent=1))
+
+    summary = scan.metadata["swarm_summary"]
+    members = scan.metadata["swarm_trace"]["members"]
+    skipped = [m for m in members if m["skipped"]]
+
+    assert skipped, "the solved-node optimisation should have retired some members"
+    assert summary["skipped"] == len(skipped)
+    assert summary["failed"] == 0, "a skip is not a failure"
+    assert summary["completed"] + summary["skipped"] == len(members)

@@ -150,6 +150,7 @@ class SwarmCoordinator:
         reservation = await governor.try_reserve()
         if reservation is None:
             record.error = "skipped: budget exhausted"
+            record.skipped = True
             return MemberOutcome(member=member, record=record, skipped=True)
 
         started = time.perf_counter()
@@ -452,6 +453,7 @@ class SwarmCoordinator:
                         skill_id=member.skill_id,
                         strategy=member.strategy,
                         wave=position // max(1, max_concurrent),
+                        skipped=True,
                         error="skipped: node already solved",
                     )
                     skipped_records.append(record)
@@ -623,7 +625,10 @@ class SwarmCoordinator:
         self, *, goal, trace, governor, board_size, findings, cancelled
     ) -> SwarmSummary:
         completed = [r for r in trace.members if not r.error]
-        failed = [r for r in trace.members if r.error]
+        skipped = [r for r in trace.members if r.skipped]
+        # Only genuine errors. Conflating skips with failures makes a healthy run -
+        # one where the first wave solved every node - read as mostly broken.
+        failed = [r for r in trace.members if r.error and not r.skipped]
         return SwarmSummary(
             goal_id=goal.id,
             goal_name=goal.name,
@@ -631,6 +636,7 @@ class SwarmCoordinator:
             agents=trace.agents,
             max_concurrent=trace.max_concurrent,
             completed=len(completed),
+            skipped=len(skipped),
             failed=len(failed),
             vulnerable=len([r for r in trace.members if r.vulnerable]),
             findings=findings,

@@ -94,7 +94,13 @@ class ScanRepository:
             records = query.order_by(FindingRecord.created_at.desc()).all()
             return [_finding_from_record(r) for r in records]
 
-    def count_web_scans_since(self, since: datetime) -> int:
+    def count_scans_since(self, since: datetime, *, scan_kind: str) -> int:
+        """Count scans of one kind created since a cutoff.
+
+        scan_kind lives in the metadata JSON rather than a column, so this filters
+        in Python. Fine at the volumes a desktop tool sees, and keeping the kind in
+        metadata is what lets swarms reuse the scans table without a migration.
+        """
         with self._session_factory() as session:
             records = (
                 session.query(ScanRecord)
@@ -104,9 +110,13 @@ class ScanRepository:
             count = 0
             for record in records:
                 meta = json.loads(record.metadata_json or "{}")
-                if meta.get("scan_kind") == "web":
+                if meta.get("scan_kind") == scan_kind:
                     count += 1
             return count
+
+    def count_web_scans_since(self, since: datetime) -> int:
+        """Retained for existing callers in the web-scan route."""
+        return self.count_scans_since(since, scan_kind="web")
 
 
 def _finding_from_record(record: FindingRecord) -> Finding:

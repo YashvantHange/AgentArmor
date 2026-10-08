@@ -7,10 +7,12 @@ import {
   ServerIcon,
   SettingsIcon,
   ShieldIcon,
+  SwarmIcon,
 } from "../icons";
 
 const NAV = [
   { to: "/", label: "Dashboard", icon: HomeIcon },
+  { to: "/swarm", label: "Swarm", icon: SwarmIcon },
   { to: "/marketplace", label: "Marketplace", icon: DatabaseIcon },
   { to: "/monitoring", label: "Monitoring", icon: ServerIcon },
   { to: "/benchmark", label: "Benchmark", icon: ChartIcon },

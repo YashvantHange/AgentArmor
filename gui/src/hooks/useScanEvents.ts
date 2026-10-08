@@ -19,6 +19,17 @@ const NAMED_EVENTS = [
   "probe.completed",
   "plan.adapted",
   "scan.completed",
+  // Swarm. An event missing from this list is silently dropped, because the
+  // stream is consumed with named addEventListener rather than onmessage.
+  "swarm.plan",
+  "swarm.roster",
+  "agent.started",
+  "agent.completed",
+  "agent.failed",
+  "agent.skipped",
+  "blackboard.fact",
+  "swarm.progress",
+  "swarm.completed",
 ];
 
 const SILENT_EVENTS = new Set(["scan.heartbeat"]);

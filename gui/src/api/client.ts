@@ -150,6 +150,110 @@ export interface ConnectionTestBody {
   response_path?: string;
 }
 
+// --- swarm -----------------------------------------------------------------
+
+export interface SwarmGoal {
+  id: string;
+  name: string;
+  description: string;
+  owasp: string[];
+  suggested_agents: number;
+  max_agents: number;
+}
+
+export interface SwarmCreateBody {
+  target_type: ScanType;
+  url?: string;
+  provider?: string;
+  model?: string;
+  auth_token?: string;
+  analysis_provider?: string;
+  analysis_model?: string;
+  analysis_api_key?: string;
+  endpoint_profile?: string;
+  goal_id: string;
+  agents?: number;
+  max_concurrent?: number;
+  formats?: string[];
+  // Deliberately no goal_text: a swarm runs a preset, so a free-text objective is
+  // unrepresentable rather than validated. Keep it that way.
+}
+
+export interface SwarmCoverage {
+  agents: number;
+  attack_paths: number;
+  nodes: number;
+  personas: number;
+  strategies: number;
+  concurrency: number;
+}
+
+export interface SwarmFact {
+  fact_id: string;
+  kind: string;
+  value: string;
+  source_member_id: string;
+  node_id?: string;
+  provenance: "observed" | "inferred" | "verified";
+  confidence: number;
+  hits: number;
+  quarantined: boolean;
+}
+
+export interface SwarmMemberRow {
+  member_id: string;
+  node_id: string;
+  path_id: string;
+  persona_id: string;
+  skill_id: string;
+  strategy: string;
+  wave: number;
+  vulnerable: boolean;
+  decision: string;
+  confidence: number;
+  tokens: number;
+  cost_usd: number;
+  calls: number;
+  latency_ms: number;
+  facts_published: number;
+  skipped: boolean;
+  error: string | null;
+}
+
+export interface SwarmSummary {
+  goal_id: string;
+  goal_name: string;
+  agents_requested: number;
+  agents: number;
+  max_concurrent: number;
+  completed: number;
+  skipped: number;
+  failed: number;
+  vulnerable: number;
+  findings: number;
+  waves: number;
+  blackboard_facts: number;
+  member_cost_usd: number;
+  enrichment_cost_usd: number;
+  total_cost_usd: number;
+  tokens_used: number;
+  degraded: boolean;
+  stopped: boolean;
+  stop_reason: string;
+  cancelled: boolean;
+  coverage: SwarmCoverage;
+}
+
+export interface SwarmCreated {
+  scan_id: string;
+  status: string;
+  scan_kind: string;
+  goal_id: string;
+  agents_requested: number;
+  agents: number;
+  max_concurrent: number;
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${base}${path}`, {
     ...init,
@@ -234,6 +338,23 @@ export interface WebScanContinueBody {
 }
 
 export const api = {
+
+  listSwarmGoals: () => request<SwarmGoal[]>("/v1/swarms/goals"),
+
+  createSwarm: (body: SwarmCreateBody) =>
+    request<SwarmCreated>("/v1/swarms", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+
+  // A swarm is a scan, so status, findings and reports come from /v1/scans/{id}.
+  getSwarm: (id: string) => request<ScanSummary>(`/v1/swarms/${id}`),
+
+  cancelSwarm: (id: string) =>
+    request<{ scan_id: string; cancelled: boolean; status: string }>(
+      `/v1/swarms/${id}/cancel`,
+      { method: "POST" }
+    ),
   health: () => request<{ status: string; version: string; webscan_ready?: boolean }>("/health"),
 
   createScan: (body: ScanCreateBody) =>

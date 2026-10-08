@@ -28,6 +28,7 @@ from agentarmor.detection.agentic.schemas import (
     SynthesisResult,
     TriageResult,
 )
+from agentarmor.core.metering import UsageMeter, record_completion_usage
 from agentarmor.knowledge.owasp_llm import owasp_entries
 from agentarmor.reporting.enrichment import EnrichmentResult
 
@@ -37,7 +38,15 @@ async def _llm_json(
     system: str,
     user: str,
     agent_name: str,
+    meter: UsageMeter | None = None,
 ) -> tuple[dict[str, Any] | None, dict[str, Any]]:
+    """Call the analysis model.
+
+    ``meter`` is optional and defaults to None, which is the historical
+    behaviour: this pipeline has never reported its spend. A swarm passes one so
+    enrichment counts against the same ceiling as member calls, instead of the
+    cost cap only covering part of the run.
+    """
     import litellm
 
     agentic = config.detection.agentic
@@ -61,6 +70,7 @@ async def _llm_json(
                 max_tokens=agentic.max_output_tokens,
             )
             content = (response.choices[0].message.content or "").strip()
+            record_completion_usage(meter, response, agentic.model)
             trace["latency_ms"] = round((time.perf_counter() - start) * 1000, 1)
             if content.startswith("{"):
                 import json
@@ -121,6 +131,7 @@ async def enrich_finding_agentic(
     result: ProbeResult,
     config: AppConfig,
     base_enrichment: EnrichmentResult,
+    meter: UsageMeter | None = None,
 ) -> EnrichmentResult:
     target_type = config.target.type.value
     prompt_text = truncate(finding.request_summary)
@@ -140,13 +151,13 @@ async def enrich_finding_agentic(
 
     trace: list[dict[str, Any]] = []
 
-    triage_raw, triage_trace = await _llm_json(config, TRIAGE_SYSTEM, user_ctx, "triage")
+    triage_raw, triage_trace = await _llm_json(config, TRIAGE_SYSTEM, user_ctx, "triage", meter=meter)
     trace.append(triage_trace)
     triage = TriageResult.model_validate(triage_raw) if isinstance(triage_raw, dict) else None
     category = (triage.category if triage else None) or _default_category(finding.probe_id)
 
     analyst_sys = ANALYST_SYSTEM.get(category, ANALYST_SYSTEM["other"])
-    analyst_raw, analyst_trace = await _llm_json(config, analyst_sys, user_ctx, "analyst")
+    analyst_raw, analyst_trace = await _llm_json(config, analyst_sys, user_ctx, "analyst", meter=meter)
     trace.append(analyst_trace)
     analyst = None
     if isinstance(analyst_raw, dict):
@@ -160,6 +171,7 @@ async def enrich_finding_agentic(
         OWASP_SYSTEM,
         user_ctx + f"\nanalyst: {analyst.model_dump() if analyst else {}}",
         "owasp_mapper",
+        meter=meter,
     )
     trace.append(owasp_trace)
     owasp_map = None
@@ -171,6 +183,7 @@ async def enrich_finding_agentic(
         REMEDIATION_SYSTEM,
         user_ctx + f"\ntarget_type: {target_type}",
         "remediation",
+        meter=meter,
     )
     trace.append(remed_trace)
     remediation = None
@@ -184,6 +197,7 @@ async def enrich_finding_agentic(
         + f"\nanalyst: {analyst.model_dump() if analyst else {}}\n"
         f"owasp: {owasp_map.model_dump() if owasp_map else {}}",
         "synthesis",
+        meter=meter,
     )
     trace.append(synth_trace)
     synthesis = None

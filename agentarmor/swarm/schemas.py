@@ -149,6 +149,10 @@ class MemberRecord(BaseModel):
     attempts: int = 1
     latency_ms: float = 0.0
     facts_published: int = 0
+    # A member retired before running - its node was already solved, or the budget
+    # was spent. Distinct from an error: a swarm that skips half its roster because
+    # the first wave broke every node is a success, not eight failures.
+    skipped: bool = False
     error: str | None = None
 
 
@@ -161,6 +165,7 @@ class SwarmSummary(BaseModel):
     agents: int = 0
     max_concurrent: int = 0
     completed: int = 0
+    skipped: int = 0
     failed: int = 0
     vulnerable: int = 0
     findings: int = 0

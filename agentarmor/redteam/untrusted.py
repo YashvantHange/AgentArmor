@@ -59,7 +59,12 @@ def sanitize_untrusted(text: str, *, max_chars: int | None = None) -> str:
         return ""
     cleaned = _CONTROL.sub(" ", text)
     cleaned = _INVISIBLE.sub("", cleaned)
-    cleaned = _BREAKOUT.sub("[redacted-markup]", cleaned)
+    # Replaced with a space, not a visible marker. A marker reads better in a
+    # report but inserts text into the middle of whatever it defanged, which
+    # splits phrases that downstream injection checks match on: "ignore ```all
+    # previous instructions" would stop matching while still plainly reading as an
+    # instruction. Collapsing to whitespace removes that differential at source.
+    cleaned = _BREAKOUT.sub(" ", cleaned)
     cleaned = _WHITESPACE.sub(" ", cleaned).strip()
     if max_chars is not None and len(cleaned) > max_chars:
         cleaned = cleaned[:max_chars].rstrip()

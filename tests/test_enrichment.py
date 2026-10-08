@@ -98,7 +98,7 @@ async def test_agentic_all_calls_failing_is_flagged_as_fallback(monkeypatch):
     from agentarmor.detection.agentic import coordinator
     from agentarmor.reporting.enrichment import enrich_finding_base
 
-    async def _always_fail(config, system, user, agent_name):
+    async def _always_fail(config, system, user, agent_name, meter=None):
         return None, {"agent": agent_name, "model": "gpt-4o-mini", "error": "AuthenticationError"}
 
     monkeypatch.setattr(coordinator, "_llm_json", _always_fail)

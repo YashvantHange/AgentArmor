@@ -133,6 +133,15 @@ class EndpointClient:
         start = time.perf_counter()
         try:
             client = self._http()
+            # Pooling the client also pooled its cookie jar. Before pooling, every
+            # probe built a fresh client and so carried no session state; a shared
+            # jar means one probe's Set-Cookie is replayed on the next, and on
+            # probes belonging to a later scan against the same target. For a tool
+            # that tests authentication boundaries that is a correctness bug, not
+            # just hygiene: a probe could appear authenticated because an earlier
+            # one was. Probes are independent single requests, so clearing the jar
+            # restores the isolation pooling removed while keeping connection reuse.
+            client.cookies.clear()
             method = (ep.http_method or "POST").upper()
             if method == "POST":
                 response = await client.post(url, json=payload, headers=headers)

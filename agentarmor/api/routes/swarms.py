@@ -74,17 +74,16 @@ class SwarmCreateRequest(BaseModel):
     max_tokens: int | None = None
     max_cost_usd: float | None = None
     formats: list[str] = Field(default_factory=lambda: ["json", "html", "sarif", "pdf"])
-    config_path: str | None = None
+    # Deliberately no config_path. The scan route accepts one, but for a swarm the
+    # configuration file supplies max_agents, max_concurrent, max_swarms_per_day,
+    # max_concurrent_swarms and the budget ceiling - every limit that keeps a run
+    # from flooding a target. Letting the request choose which file to load would
+    # let it choose its own ceilings, which defeats apply_swarm_options entirely.
+    # The server's config comes from AGENTARMOR_CONFIG and nowhere else.
 
 
 def _build_config(body: SwarmCreateRequest) -> AppConfig:
-    cfg = load_config(
-        Path(body.config_path)
-        if body.config_path
-        else _config_path
-        if _config_path.exists()
-        else None
-    )
+    cfg = load_config(_config_path if _config_path.exists() else None)
     target_type = body.target_type.lower()
     if target_type == "endpoint":
         cfg = merge_cli_target(cfg, url=body.url)
@@ -244,6 +243,12 @@ async def get_swarm(scan_id: str) -> dict:
     if metadata.get("scan_kind") != "swarm":
         raise HTTPException(404, "not a swarm scan")
     data = scan.model_dump(mode="json")
+    # Target headers carry the bearer token used to reach the system under test.
+    # The UI never needs it, and this endpoint is unauthenticated with CORS open,
+    # so returning it would hand the credential to any page the user visits.
+    target = data.get("target")
+    if isinstance(target, dict) and target.get("headers"):
+        target["headers"] = {key: "[redacted]" for key in target["headers"]}
     data["running"] = job_registry.is_running(scan_id)
     return data
 

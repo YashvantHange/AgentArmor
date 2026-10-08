@@ -264,3 +264,45 @@ def test_aclose_all_empties_the_pool():
         assert not pool._all_clients()
 
     asyncio.run(run())
+
+
+def test_the_pooled_client_does_not_carry_cookies_between_probes(monkeypatch):
+    """Pooling the client also pooled its cookie jar.
+
+    Before pooling, each probe built a fresh client and carried no session state.
+    A shared jar would replay one probe's Set-Cookie on the next, including probes
+    from a later scan against the same target - which for a tool that tests
+    authentication boundaries can make a probe look authenticated because an
+    earlier one was.
+    """
+    seen_cookies: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen_cookies.append(request.headers.get("cookie", ""))
+        return httpx.Response(
+            200,
+            json={"choices": [{"message": {"content": "ok"}}]},
+            headers={
+                "content-type": "application/json",
+                "set-cookie": "session=leaked-value; Path=/",
+            },
+        )
+
+    real_init = httpx.AsyncClient.__init__
+
+    def init(self, *args, **kwargs):
+        kwargs["transport"] = httpx.MockTransport(handler)
+        real_init(self, *args, **kwargs)
+
+    monkeypatch.setattr(httpx.AsyncClient, "__init__", init)
+    cfg = _config(rps=0.0)
+
+    async def run():
+        for i in range(3):
+            await send_probe(cfg, f"p{i}", "probe", ["LLM01"], _request())
+
+    asyncio.run(run())
+
+    assert len(seen_cookies) == 3
+    for index, cookie in enumerate(seen_cookies):
+        assert "leaked-value" not in cookie, f"probe {index} replayed a prior session"

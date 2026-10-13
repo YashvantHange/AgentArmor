@@ -100,3 +100,33 @@ def test_the_stale_release_body_is_gone():
     generated from the changelog now, so the file must not come back.
     """
     assert not (REPO / "docs" / "RELEASE_BODY.md").exists()
+
+
+def test_the_docs_do_not_tell_users_to_install_an_unrelated_package():
+    """The `agentarmor` name on PyPI belongs to a different project.
+
+    `pip install agentarmor` fetches `ankitlade12/AgentArmor`, so a user following
+    our own README ends up with someone else's package and no `agentarmor` command.
+    Every documented install must therefore name this repository.
+    """
+    for relative in ("README.md", "docs/MAC.md", "scripts/changelog_section.py"):
+        path = REPO / relative
+        if not path.exists():
+            continue
+        for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+            if "pip install" not in line or "agentarmor" not in line:
+                continue
+            if line.lstrip().startswith(">") or "belongs to an" in line:
+                continue  # the note explaining the situation names it on purpose
+            if "pip install -e" in line or "maturin" in line:
+                continue  # developer checkout, already this repository
+            assert "git+" in line and "YashvantHange/AgentArmor" in line, (
+                f"{relative}:{number} installs from PyPI, which is a different "
+                f"project: {line.strip()!r}"
+            )
+
+
+def test_the_github_action_installs_from_this_repository():
+    text = (REPO / "action" / "action.yml").read_text(encoding="utf-8")
+    assert "git+https://github.com/YashvantHange/AgentArmor" in text
+    assert 'pip install "agentarmor==' not in text

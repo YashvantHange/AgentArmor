@@ -30,7 +30,11 @@ runs:
   steps:
     - name: Install AgentArmor
       shell: bash
-      run: pip install "agentarmor==${{ inputs.version }}"
+        # Installed from the repository, not PyPI: the agentarmor name there belongs
+        # to an unrelated project, so `pip install agentarmor==<v>` fetched someone
+        # else's package and `agentarmor scan` was then not on PATH. This action has
+        # never worked for that reason.
+      run: pip install "agentarmor @ git+https://github.com/YashvantHange/AgentArmor.git@v${{ inputs.version }}"
     - name: Run security scan
       shell: bash
       run: |

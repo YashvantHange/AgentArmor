@@ -10,9 +10,9 @@ v1.0.0 ships a **Windows desktop installer** on GitHub Releases. macOS uses **Py
 ## Quick start (CLI only)
 
 ```bash
-pip install agentarmor
+pip install "agentarmor @ git+https://github.com/YashvantHange/AgentArmor.git@v1.5.0"
 # Optional: local model scanning
-pip install agentarmor[local]
+pip install "agentarmor[local] @ git+https://github.com/YashvantHange/AgentArmor.git@v1.5.0"
 
 agentarmor models download
 

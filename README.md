@@ -58,14 +58,19 @@ Portable mode: place a file named `PORTABLE` next to the executable; data is sto
 ### CLI (all platforms)
 
 ```bash
-pip install agentarmor
+pip install "agentarmor @ git+https://github.com/YashvantHange/AgentArmor.git@v1.5.0"
 
 # Optional: offline local model scanning
-pip install agentarmor[local]
+pip install "agentarmor[local] @ git+https://github.com/YashvantHange/AgentArmor.git@v1.5.0"
 
 # One-time detection model download
 agentarmor models download
 ```
+
+> **Note on `pip install agentarmor`:** the `agentarmor` name on PyPI belongs to an
+> unrelated project. Installing it does **not** get you this tool. Install from this
+> repository until a published package name is settled.
+
 
 ### Docker
 
@@ -134,7 +139,7 @@ agentarmor scan --rag ./corpus --embedder bge
 ### Local models (offline)
 
 ```bash
-pip install agentarmor[local]
+pip install "agentarmor[local] @ git+https://github.com/YashvantHange/AgentArmor.git@v1.5.0"
 agentarmor scan --model llama-3.gguf
 agentarmor scan --model ./models/qwen3
 ```
@@ -281,7 +286,7 @@ See [probes/custom_probe.py](probes/custom_probe.py) and `agentarmor.sdk.probe_s
 No native Mac `.app` yet (Windows desktop first). Use PyPI + CLI or dev GUI:
 
 ```bash
-pip install agentarmor
+pip install "agentarmor @ git+https://github.com/YashvantHange/AgentArmor.git@v1.5.0"
 agentarmor models download
 agentarmor serve --port 8787
 ```

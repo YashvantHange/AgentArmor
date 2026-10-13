@@ -69,9 +69,43 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="AgentArmor", version=__version__, lifespan=lifespan)
+# Origins the desktop app and local development actually use. Everything else is
+# refused.
+#
+# allow_origins=["*"] with allow_credentials=True was worse than it looked:
+# Starlette sets preflight_explicit_allow_origin = not allow_all_origins or
+# allow_credentials, so it echoed the *requesting* origin instead of "*". A
+# preflight from https://evil.example.com came back with
+# access-control-allow-origin: https://evil.example.com and
+# access-control-allow-credentials: true - meaning any page the user had open could
+# drive this API, which since 1.5.0 includes launching a hundred-agent swarm at a
+# host of its choosing.
+#
+# A request with no Origin header never reaches this middleware, so the CLI, curl
+# and anything non-browser are unaffected. A browser always sends Origin on a
+# cross-origin request, and a JSON body is not a CORS-simple content type, so a
+# drive-by POST must preflight - and now fails it.
+_DEFAULT_ALLOWED_ORIGIN_REGEX = (
+    r"^(?:"
+    r"tauri://localhost"  # Tauri v2 on macOS and Linux
+    r"|https?://tauri\.localhost"  # Tauri v2 on Windows
+    r"|https?://(?:localhost|127\.0\.0\.1)(?::\d+)?"  # vite dev server, direct browsing
+    r")$"
+)
+
+
+def allowed_origin_regex() -> str:
+    """The origin allowlist, overridable for an unusual packaging or host.
+
+    Set AGENTARMOR_ALLOW_ORIGIN_REGEX to replace it. Set it to ".*" to restore the
+    previous allow-anything behaviour, deliberately and visibly.
+    """
+    return os.environ.get("AGENTARMOR_ALLOW_ORIGIN_REGEX") or _DEFAULT_ALLOWED_ORIGIN_REGEX
+
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origin_regex=allowed_origin_regex(),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

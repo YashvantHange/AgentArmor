@@ -71,15 +71,19 @@ class ScanCreateRequest(BaseModel):
     finding_groups: bool | None = None
     scan_profile: str | None = None
     formats: list[str] = Field(default_factory=lambda: ["json", "html", "sarif"])
-    config_path: str | None = None
+    # Deliberately no config_path. The configuration file supplies
+    # detection.agentic.max_tokens_per_scan and max_cost_usd_per_scan, which
+    # enforce_plan_budget then checks the request against - so a request choosing
+    # the file chose its own budget ceiling. Nothing sent this field: not the GUI,
+    # not the CLI (which calls execute_scan directly with --config), not any test.
+    # The server's config comes from AGENTARMOR_CONFIG and nowhere else.
+    #
+    # Removed from the swarm route first, where the file also supplied the
+    # concurrency and daily caps that keep a run from flooding a target.
 
 
 def _build_config(body: ScanCreateRequest):
-    cfg = load_config(
-        Path(body.config_path) if body.config_path else _config_path
-        if (body.config_path or _config_path.exists())
-        else None
-    )
+    cfg = load_config(_config_path if _config_path.exists() else None)
     ttype = body.target_type.lower()
     if ttype == "endpoint":
         cfg = merge_cli_target(cfg, url=body.url)

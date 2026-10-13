@@ -15,7 +15,21 @@ _warned_fallback = False
 
 
 def _warn_fallback_once() -> None:
+    """Warn once that the native engine is absent - only when it actually is.
+
+    ``scan_with_echo_filter`` always uses the Python implementation, because the
+    Rust extension exposes ``scan(text)`` and ``rule_count()`` and has no
+    echo-aware entry point. That is a correct fallback, but it used to emit
+    "Rust L1 engine not installed" unconditionally, telling users who had already
+    built the extension to go build it - which is what the shipped installer logs
+    on every start.
+
+    The engine being unused on the echo path is a separate matter from it being
+    missing, and only the second is the user's to act on.
+    """
     global _warned_fallback
+    if _RUST_AVAILABLE:
+        return
     if not _warned_fallback:
         warnings.warn(
             "Rust L1 engine not installed; using Python fallback. "
@@ -73,6 +87,14 @@ def scan(text: str) -> L1Result:
 
 
 def scan_with_echo_filter(text: str, echo_spans: list | None) -> L1Result:
+    """Echo-aware scan. Python only, by necessity rather than by choice.
+
+    The Rust extension exports ``scan(text)`` and ``rule_count()``; it has no
+    entry point that accepts echo spans, so there is nothing to dispatch to here.
+    This is the path ``detection/pipeline.py`` uses, which means the native engine
+    is currently unused by a scan even when it is compiled and importable - only
+    the detection API's direct ``scan()`` reaches it.
+    """
     import time
 
     start = time.perf_counter()

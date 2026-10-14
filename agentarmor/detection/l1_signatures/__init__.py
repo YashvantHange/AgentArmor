@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-import warnings
 from dataclasses import dataclass
 
 from agentarmor.detection.l1_signatures.fallback import L1ScanResult, scan as python_scan
@@ -11,32 +10,6 @@ from agentarmor.detection.l1_signatures.fallback import L1ScanResult, scan as py
 logger = logging.getLogger(__name__)
 _RUST_AVAILABLE = False
 _rust_scan = None
-_warned_fallback = False
-
-
-def _warn_fallback_once() -> None:
-    """Warn once that the native engine is absent - only when it actually is.
-
-    ``scan_with_echo_filter`` always uses the Python implementation, because the
-    Rust extension exposes ``scan(text)`` and ``rule_count()`` and has no
-    echo-aware entry point. That is a correct fallback, but it used to emit
-    "Rust L1 engine not installed" unconditionally, telling users who had already
-    built the extension to go build it - which is what the shipped installer logs
-    on every start.
-
-    The engine being unused on the echo path is a separate matter from it being
-    missing, and only the second is the user's to act on.
-    """
-    global _warned_fallback
-    if _RUST_AVAILABLE:
-        return
-    if not _warned_fallback:
-        warnings.warn(
-            "Rust L1 engine not installed; using Python fallback. "
-            "Build with: cd native/l1_signatures && maturin develop --release",
-            stacklevel=2,
-        )
-        _warned_fallback = True
 
 
 try:
@@ -59,22 +32,41 @@ class L1Result:
 
 
 def scan(text: str) -> L1Result:
+    """Signature scan. Python, so the result shape does not depend on the build host.
+
+    This used to dispatch to the Rust extension when it imported. Both engines agree
+    on score and matches - the parity test checks that - but the Rust one returns no
+    evidence spans, and those carry the matched text, its offsets, the rule, its
+    weight, and the owasp and cwe mappings added in 1.4.1. They flow through
+    collect_evidence_spans into detection.evidence, which the reports and swarm fact
+    extraction read.
+
+    So whether a Rust toolchain happened to be present when the environment was
+    built decided whether this function returned evidence. Installing the native
+    engine silently made the detection API return less.
+
+    Measured before removing the dispatch, on the 8000-character cap that
+    parse_http_body applies to every response, so this is the realistic ceiling
+    rather than a synthetic best case:
+
+        payload              python      rust
+        typical response    0.14 ms    0.005 ms
+        at the 8 KB cap     ~6 ms      ~0.08 ms
+
+    Six milliseconds per probe, against a swarm that is rate-limited to five
+    requests a second and spends seconds per probe waiting on a model. Reaching
+    parity would mean reimplementing echo-span filtering and the full evidence-span
+    metadata in Rust and keeping 31 security rules in lockstep across two languages -
+    where a divergence means a rule that fires in one engine and not the other. That
+    is not a trade worth making for six milliseconds.
+
+    The crate, its CI job and the parity test all stay: the rules remain in step, so
+    wiring it back in later is still possible if it grows evidence spans.
+    """
     import time
 
     start = time.perf_counter()
-    if _RUST_AVAILABLE and _rust_scan is not None:
-        raw = _rust_scan(text)
-        latency_ms = (time.perf_counter() - start) * 1000
-        return L1Result(
-            score=float(raw["score"]),
-            matches=list(raw["matches"]),
-            categories=list(raw["categories"]),
-            engine="rust",
-            latency_ms=latency_ms,
-        )
-
     result: L1ScanResult = python_scan(text)
-    _warn_fallback_once()
     latency_ms = (time.perf_counter() - start) * 1000
     return L1Result(
         score=result.score,
@@ -99,7 +91,6 @@ def scan_with_echo_filter(text: str, echo_spans: list | None) -> L1Result:
 
     start = time.perf_counter()
     result: L1ScanResult = python_scan(text, echo_spans=echo_spans)
-    _warn_fallback_once()
     latency_ms = (time.perf_counter() - start) * 1000
     return L1Result(
         score=result.score,

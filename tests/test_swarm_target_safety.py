@@ -53,7 +53,7 @@ class _Recorder:
     def handler(self, request: httpx.Request) -> httpx.Response:
         self.in_flight += 1
         self.max_in_flight = max(self.max_in_flight, self.in_flight)
-        self.sent.append((str(request.url), time.monotonic()))
+        self.sent.append((str(request.url), time.perf_counter()))
         self.in_flight -= 1
         return httpx.Response(
             200,
@@ -80,27 +80,44 @@ def _request() -> ProbeRequest:
     return ProbeRequest(messages=[{"role": "user", "content": "probe"}])
 
 
+# RateLimiter reads time.monotonic(), whose resolution is ~15.6 ms on Windows, so
+# its own enforcement is quantised to that. An assertion on any single gap is
+# therefore unreliable; total elapsed time over several requests is not, and it is
+# also the property "rate limited" actually means.
+_CLOCK_TICK_S = 0.016
+
+
 def test_concurrent_probes_are_spaced_by_the_rate_limit(monkeypatch):
     """Many coroutines, one shared limiter.
 
     This is the shape a swarm produces: several members issuing probes at once
-    against the same target. Pre-pool each got its own limiter and the spacing was
-    zero.
+    against the same target. Pre-pool each got its own limiter, so all six went out
+    together and total elapsed time was ~0.
     """
     recorder = _Recorder()
     _patch_transport(monkeypatch, recorder)
-    cfg = _config(URL_A, rps=20.0)  # 0.05s apart
+    probes = 6
+    rps = 20.0
+    interval = 1.0 / rps
+    cfg = _config(URL_A, rps=rps)
 
     async def run():
+        started = time.perf_counter()
         await asyncio.gather(
-            *[send_probe(cfg, f"p{i}", "probe", ["LLM01"], _request()) for i in range(6)]
+            *[send_probe(cfg, f"p{i}", "probe", ["LLM01"], _request()) for i in range(probes)]
         )
+        return time.perf_counter() - started
 
-    asyncio.run(run())
+    elapsed = asyncio.run(run())
 
-    assert len(recorder.sent) == 6
-    gaps = recorder.gaps()
-    assert min(gaps) >= 0.045, f"requests were not spaced by the rate limit: {gaps}"
+    assert len(recorder.sent) == probes
+    # Five intervals for six requests, less one clock tick of slack for the
+    # limiter's own quantisation.
+    floor = (probes - 1) * interval - _CLOCK_TICK_S
+    assert elapsed >= floor, (
+        f"{probes} probes at {rps} rps finished in {elapsed:.3f}s, under the "
+        f"{floor:.3f}s the rate limit requires; gaps were {recorder.gaps()}"
+    )
 
 
 def test_one_limiter_is_shared_across_concurrent_callers(monkeypatch):

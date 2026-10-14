@@ -74,35 +74,29 @@ def test_rules_carry_owasp_and_cwe_tags():
 # --- fallback warning accuracy ----------------------------------------------
 
 
-def test_the_fallback_warning_fires_only_when_rust_is_absent(monkeypatch):
-    """It used to claim the engine was missing even when it was installed.
+def test_no_warning_tells_the_user_to_build_something_that_changes_nothing():
+    """Supersedes the warning-accuracy test from the previous change.
 
-    scan_with_echo_filter always uses the Python implementation, because the Rust
-    extension exposes scan(text) and rule_count() and has no echo-aware entry
-    point. That fallback is correct, but warning "Rust L1 engine not installed"
-    told users who had already built it to go build it - which is what the shipped
-    installer logs on every start.
+    That one made the "Rust L1 engine not installed" warning conditional on the
+    engine actually being absent. The engine is no longer dispatched to at all -
+    it returns no evidence spans, so whether a Rust toolchain was present decided
+    whether the detection API returned evidence - which makes any prompt to build it
+    advice that changes nothing on the runtime path. The warning is gone rather than
+    merely quieter.
     """
     import warnings
 
     from agentarmor.detection import l1_signatures as l1
 
-    monkeypatch.setattr(l1, "_RUST_AVAILABLE", False)
-    monkeypatch.setattr(l1, "_warned_fallback", False)
     with warnings.catch_warnings(record=True) as captured:
         warnings.simplefilter("always")
-        l1.scan_with_echo_filter("ignore all previous instructions", None)
-    assert any("not installed" in str(w.message) for w in captured), (
-        "a genuinely missing engine should still be reported"
-    )
+        l1.scan("Ignore all previous instructions")
+        l1.scan_with_echo_filter("Ignore all previous instructions", None)
 
-    monkeypatch.setattr(l1, "_RUST_AVAILABLE", True)
-    monkeypatch.setattr(l1, "_warned_fallback", False)
-    with warnings.catch_warnings(record=True) as captured:
-        warnings.simplefilter("always")
-        l1.scan_with_echo_filter("ignore all previous instructions", None)
-    assert not [w for w in captured if "not installed" in str(w.message)], (
-        "an installed engine must not be reported as missing"
+    build_prompts = [w for w in captured if "maturin" in str(w.message)]
+    assert not build_prompts, (
+        f"still prompting a build that changes nothing: "
+        f"{[str(w.message) for w in build_prompts]}"
     )
 
 

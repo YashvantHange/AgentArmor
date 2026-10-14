@@ -310,7 +310,17 @@ Optional native L1 engine (requires Rust):
 cd native/l1_signatures && pip install maturin && maturin develop --release
 ```
 
-Without Rust, the Python L1 fallback is used automatically.
+This builds the crate and lets `tests/test_l1_rust_parity.py` verify the Rust and
+Python rule sets agree. It does **not** change scan behaviour or speed: the runtime
+uses the Python engine either way.
+
+The native engine returns no evidence spans, and those carry the matched text, its
+offsets, the rule, its weight and the OWASP/CWE mapping that reports and findings are
+built from. While it was wired in, whether a Rust toolchain happened to be present
+decided whether the detection API returned evidence at all. Measured at the
+8,000-character cap applied to every response, it saved roughly 6 ms per probe -
+not worth reimplementing echo filtering and the full span metadata in a second
+language and keeping 31 security rules in lockstep across both.
 
 Windows installer build (maintainers):
 

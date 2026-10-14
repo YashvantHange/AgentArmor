@@ -136,3 +136,82 @@ def test_the_default_matches_what_tauri_config_declares():
     assert re.match(allowed_origin_regex(), dev_url), (
         f"tauri devUrl {dev_url} is not in the CORS allowlist"
     )
+
+
+# --- narrowed origin ports --------------------------------------------------
+
+
+@pytest.mark.parametrize("origin", [
+    "http://localhost:3000",
+    "http://localhost:9999",
+    "http://127.0.0.1:5000",
+    "http://localhost:8888",   # a notebook
+])
+def test_other_local_servers_are_not_trusted_origins(client, origin):
+    """A review called the original allowlist over-broad, and it was.
+
+    Allowing localhost on any port makes every other local web server a trusted
+    origin - a dev server, a notebook, a tool installed by an npm postinstall - and
+    a page served from any of them could then drive this API.
+    """
+    response = _preflight(client, origin)
+    assert "access-control-allow-origin" not in response.headers, (
+        f"{origin} was trusted purely for being local"
+    )
+
+
+def test_the_ports_that_are_allowed_are_the_ones_the_product_uses(client):
+    from agentarmor.api.app import DEFAULT_API_PORT, VITE_DEV_PORT
+
+    for port in (VITE_DEV_PORT, DEFAULT_API_PORT):
+        response = _preflight(client, f"http://localhost:{port}")
+        assert response.headers.get("access-control-allow-origin"), (
+            f"port {port} must stay allowed; the GUI is served from it"
+        )
+
+
+# --- host validation, which is what stops DNS rebinding ---------------------
+
+
+@pytest.mark.parametrize("host", [
+    "evil.example.com",
+    "evil.example.com:8787",
+    "attacker.test",
+])
+def test_a_request_addressed_to_another_name_is_refused(client, host):
+    """CORS alone does not stop DNS rebinding.
+
+    An attacker can point evil.example.com at 127.0.0.1. The Origin check refuses
+    the cross-origin request, but nothing was verifying the request was addressed
+    to this service at all. The server binds loopback, so Host: evil.example.com is
+    never legitimate.
+    """
+    response = client.get("/health", headers={"Host": host})
+    assert response.status_code == 400
+
+
+@pytest.mark.parametrize("host", ["localhost", "127.0.0.1", "localhost:8787", "tauri.localhost"])
+def test_the_hosts_the_product_uses_are_accepted(client, host):
+    response = client.get("/health", headers={"Host": host})
+    assert response.status_code == 200
+
+
+def test_the_host_allowlist_is_overridable(monkeypatch):
+    """Needed when deliberately binding something other than loopback."""
+    from agentarmor.api.app import allowed_hosts
+
+    monkeypatch.setenv("AGENTARMOR_ALLOWED_HOSTS", "scanner.internal, 10.0.0.5")
+    assert allowed_hosts() == ["scanner.internal", "10.0.0.5"]
+
+
+def test_the_host_check_runs_before_cors(client):
+    """A rebound request should be refused outright, not evaluated for an origin.
+
+    If CORS ran first the response would carry CORS headers for a request that was
+    never addressed to this service.
+    """
+    response = client.get(
+        "/health",
+        headers={"Host": "evil.example.com", "Origin": "tauri://localhost"},
+    )
+    assert response.status_code == 400

